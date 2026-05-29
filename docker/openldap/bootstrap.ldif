@@ -1,0 +1,156 @@
+version: 1
+# ByteBite OpenLDAP Bootstrap Configuration
+# Base DN: dc=bytebite,dc=local
+
+# Domain Component
+dn: dc=bytebite,dc=local
+objectClass: top
+objectClass: dcObject
+objectClass: organization
+o: ByteBite
+dc: bytebite
+description: ByteBite Log Analysis AI Organization
+
+# Root Organization
+dn: ou=people,dc=bytebite,dc=local
+objectClass: top
+objectClass: organizationalUnit
+ou: people
+description: ByteBite Users
+
+dn: ou=groups,dc=bytebite,dc=local
+objectClass: top
+objectClass: organizationalUnit
+ou: groups
+description: ByteBite Groups
+
+# Admin User
+dn: uid=admin,ou=people,dc=bytebite,dc=local
+objectClass: top
+objectClass: person
+objectClass: organizationalPerson
+objectClass: inetOrgPerson
+uid: admin
+cn: Admin User
+sn: Administrator
+givenName: Admin
+mail: admin@bytebite.local
+userPassword: {SSHA}W6ph5Mm5Pz8GgiULbPgQ37lrDGQ1LCcP8h9qWV+3Ees=
+ou: Administrators
+description: ByteBite System Administrator
+
+# Manager User
+dn: uid=manager,ou=people,dc=bytebite,dc=local
+objectClass: top
+objectClass: person
+objectClass: organizationalPerson
+objectClass: inetOrgPerson
+uid: manager
+cn: Manager User
+sn: Manager
+givenName: Manager
+mail: manager@bytebite.local
+userPassword: {SSHA}W6ph5Mm5Pz8GgiULbPgQ37lrDGQ1LCcP8h9qWV+3Ees=
+ou: Management
+description: ByteBite Operations Manager
+
+# Staff User 1
+dn: uid=staff1,ou=people,dc=bytebite,dc=local
+objectClass: top
+objectClass: person
+objectClass: organizationalPerson
+objectClass: inetOrgPerson
+uid: staff1
+cn: Staff User One
+sn: Staff
+givenName: User One
+mail: staff1@bytebite.local
+userPassword: {SSHA}W6ph5Mm5Pz8GgiULbPgQ37lrDGQ1LCcP8h9qWV+3Ees=
+ou: Staff
+description: ByteBite Staff Member
+
+# Staff User 2
+dn: uid=staff2,ou=people,dc=bytebite,dc=local
+objectClass: top
+objectClass: person
+objectClass: organizationalPerson
+objectClass: inetOrgPerson
+uid: staff2
+cn: Staff User Two
+sn: Staff
+givenName: User Two
+mail: staff2@bytebite.local
+userPassword: {SSHA}W6ph5Mm5Pz8GgiULbPgQ37lrDGQ1LCcP8h9qWV+3Ees=
+ou: Staff
+description: ByteBite Staff Member
+
+# KDS Operator User
+dn: uid=kds_operator,ou=people,dc=bytebite,dc=local
+objectClass: top
+objectClass: person
+objectClass: organizationalPerson
+objectClass: inetOrgPerson
+uid: kds_operator
+cn: KDS Operator
+sn: Operator
+givenName: KDS
+mail: kds@bytebite.local
+userPassword: {SSHA}W6ph5Mm5Pz8GgiULbPgQ37lrDGQ1LCcP8h9qWV+3Ees=
+ou: KDS
+description: Kitchen Display System Operator
+
+# Customer User
+dn: uid=customer1,ou=people,dc=bytebite,dc=local
+objectClass: top
+objectClass: person
+objectClass: organizationalPerson
+objectClass: inetOrgPerson
+uid: customer1
+cn: Customer User
+sn: Customer
+givenName: John
+mail: customer1@bytebite.local
+userPassword: {SSHA}W6ph5Mm5Pz8GgiULbPgQ37lrDGQ1LCcP8h9qWV+3Ees=
+ou: Customers
+description: ByteBite Customer
+
+# Administrators Group
+dn: cn=administrators,ou=groups,dc=bytebite,dc=local
+objectClass: top
+objectClass: groupOfNames
+cn: administrators
+member: uid=admin,ou=people,dc=bytebite,dc=local
+description: ByteBite Administrators
+
+# Managers Group
+dn: cn=managers,ou=groups,dc=bytebite,dc=local
+objectClass: top
+objectClass: groupOfNames
+cn: managers
+member: uid=manager,ou=people,dc=bytebite,dc=local
+description: ByteBite Managers
+
+# Staff Group
+dn: cn=staff,ou=groups,dc=bytebite,dc=local
+objectClass: top
+objectClass: groupOfNames
+cn: staff
+member: uid=staff1,ou=people,dc=bytebite,dc=local
+member: uid=staff2,ou=people,dc=bytebite,dc=local
+description: ByteBite Staff Members
+
+# KDS Group
+dn: cn=kds,ou=groups,dc=bytebite,dc=local
+objectClass: top
+objectClass: groupOfNames
+cn: kds
+member: uid=kds_operator,ou=people,dc=bytebite,dc=local
+description: Kitchen Display System Operators
+
+# Customers Group
+dn: cn=customers,ou=groups,dc=bytebite,dc=local
+objectClass: top
+objectClass: groupOfNames
+cn: customers
+member: uid=customer1,ou=people,dc=bytebite,dc=local
+description: ByteBite Customers

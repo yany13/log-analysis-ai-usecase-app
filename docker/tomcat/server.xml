@@ -1,0 +1,135 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Server port="8005" shutdown="SHUTDOWN">
+  <Listener className="org.apache.catalina.startup.VersionLoggerListener" />
+  <Listener className="org.apache.catalina.core.AprLifecycleListener" SSLEngine="on" />
+  <Listener className="org.apache.catalina.core.JreMemoryLeakPreventionListener" />
+  <Listener className="org.apache.catalina.mbeans.GlobalResourcesLifecycleListener" />
+  <Listener className="org.apache.catalina.core.ThreadLocalLeakPreventionListener" />
+
+  <GlobalNamingResources>
+    <!-- PostgreSQL DataSource -->
+    <Resource name="jdbc/bytebite"
+              auth="Container"
+              type="javax.sql.DataSource"
+              driverClassName="org.postgresql.Driver"
+              url="jdbc:postgresql://${env.DB_HOST}:${env.DB_PORT}/${env.DB_NAME}"
+              username="${env.DB_USER}"
+              password="${env.DB_PASSWORD}"
+              maxActive="20"
+              maxIdle="10"
+              maxWait="30000"
+              validationQuery="SELECT 1"
+              validationInterval="34000"
+              testOnBorrow="true"
+              testOnReturn="false"
+              testWhileIdle="true"
+              timeBetweenEvictionRunsMillis="34000"
+              numTestsPerEvictionRun="3"
+              minEvictableIdleTimeMillis="55000" />
+
+    <!-- LDAP Context Factory for Authentication -->
+    <Resource name="ldap/bytebite"
+              auth="Container"
+              type="com.sun.jndi.ldap.LdapCtxFactory"
+              providerUrl="ldap://${env.LDAP_HOST}:${env.LDAP_PORT}"
+              securityAuthentication="simple"
+              securityPrincipal="${env.LDAP_BIND_DN}"
+              securityCredentials="${env.LDAP_BIND_PASSWORD}"
+              baseCtxDn="${env.LDAP_BASE_DN}"
+              userPattern="uid={0},ou=people,${env.LDAP_BASE_DN}"
+              userSearch="(&amp;(uid={0})(objectClass=inetOrgPerson))"
+              userSubtree="true"
+              groupPattern="cn={0},ou=groups,${env.LDAP_BASE_DN}"
+              groupSearch="member={0}"
+              groupSubtree="true" />
+  </GlobalNamingResources>
+
+  <Service name="Catalina">
+    <!-- HTTP Connector -->
+    <Connector port="8080"
+               protocol="HTTP/1.1"
+               connectionTimeout="20000"
+               redirectPort="8443"
+               maxThreads="150"
+               minSpareThreads="25"
+               maxSpareThreads="75"
+               enableLookups="false"
+               acceptCount="100"
+               compression="on"
+               compressionMinSize="1024"
+               compressableMimeType="text/html,text/xml,text/javascript,application/json,application/javascript" />
+
+    <!-- HTTPS Connector (SSL/TLS) -->
+    <Connector port="8443"
+               protocol="org.apache.coyote.http11.Http11NioProtocol"
+               maxThreads="150"
+               minSpareThreads="25"
+               maxSpareThreads="75"
+               enableLookups="false"
+               disableUploadTimeout="true"
+               acceptCount="100"
+               scheme="https"
+               secure="true"
+               clientAuth="false"
+               sslProtocol="TLSv1.2,TLSv1.3"
+               sslEnabledProtocols="TLSv1.2,TLSv1.3"
+               keystoreFile="${env.SSL_KEYSTORE_PATH}"
+               keystorePass="${env.SSL_KEYSTORE_PASSWORD}"
+               keyAlias="tomcat"
+               compression="on"
+               compressionMinSize="1024"
+               compressableMimeType="text/html,text/xml,text/javascript,application/json,application/javascript" />
+
+    <!-- AJP Connector (for reverse proxy like Apache httpd) -->
+    <Connector port="8009"
+               protocol="AJP/1.3"
+               redirectPort="8443"
+               maxThreads="150"
+               minSpareThreads="25"
+               maxSpareThreads="75"
+               enableLookups="false"
+               acceptCount="100" />
+
+    <Engine name="Catalina" defaultHost="localhost">
+      <!-- Access Log -->
+      <Valve className="org.apache.catalina.valves.AccessLogValve"
+             directory="logs"
+             prefix="access_log"
+             suffix=".log"
+             pattern="%h %l %u %t &quot;%r&quot; %s %b &quot;%{Referer}i&quot; &quot;%{User-Agent}i&quot; %D" />
+
+      <!-- Request Dump Valve for debugging (optional) -->
+      <!-- <Valve className="org.apache.catalina.valves.RequestDumperValve" /> -->
+
+      <!-- Error Report Valve -->
+      <Valve className="org.apache.catalina.valves.ErrorReportValve"
+             showServerInfo="false"
+             showReport="false" />
+
+      <!-- ByteBite Application Host -->
+      <Host name="localhost" appBase="webapps" unpackWARs="true" autoDeploy="true">
+        <!-- Context for ByteBite Application -->
+        <Context path="/bytebite"
+                 docBase="bytebite"
+                 useNaming="true"
+                 reloadable="false">
+
+          <!-- Resource links to Global resources -->
+          <ResourceLink name="jdbc/bytebite"
+                        global="jdbc/bytebite"
+                        type="javax.sql.DataSource" />
+
+          <ResourceLink name="ldap/bytebite"
+                        global="ldap/bytebite"
+                        type="com.sun.jndi.ldap.LdapCtxFactory" />
+
+          <!-- Session persistence (optional) -->
+          <Manager pathname="SESSIONS.ser" />
+        </Context>
+
+        <!-- Root Context -->
+        <Context path="" docBase="ROOT" />
+      </Host>
+    </Engine>
+  </Service>
+</Server>

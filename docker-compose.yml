@@ -1,0 +1,119 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: bytebite-postgres
+    environment:
+      POSTGRES_DB: bytebite_db
+      POSTGRES_USER: bytebite
+      POSTGRES_PASSWORD: bytebite_secure_pwd_123
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - bytebite-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bytebite"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # OpenLDAP Authentication Server
+  openldap:
+    image: osixia/openldap:1.5.0
+    container_name: bytebite-openldap
+    environment:
+      LDAP_LOG_LEVEL: 256
+      LDAP_ORGANISATION: ByteBite
+      LDAP_DOMAIN: bytebite.local
+      LDAP_BASE_DN: dc=bytebite,dc=local
+      LDAP_ADMIN_PASSWORD: admin_secure_pwd_123
+      LDAP_CONFIG_PASSWORD: config_secure_pwd_123
+      LDAP_READONLY_USER: true
+      LDAP_READONLY_USER_USERNAME: readonly
+      LDAP_READONLY_USER_PASSWORD: readonly_secure_pwd_123
+    ports:
+      - "389:389"
+      - "636:636"
+    volumes:
+      - openldap_data:/var/lib/ldap
+      - openldap_config:/etc/ldap/slapd.d
+      - ./docker/openldap/bootstrap.ldif:/container/service/slapd/assets/config/bootstrap/ldif/custom/bootstrap.ldif
+    networks:
+      - bytebite-network
+    healthcheck:
+      test: ["CMD", "ldapsearch", "-x", "-b", "dc=bytebite,dc=local"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # Apache Tomcat Application Server
+  tomcat:
+    build:
+      context: ./docker/tomcat
+      dockerfile: Dockerfile
+    container_name: bytebite-tomcat
+    environment:
+      JAVA_OPTS: >
+        -Dcom.sun.jndi.ldap.connect.pool=true
+        -Dcom.sun.jndi.ldap.connect.pool.maxsize=20
+        -Dcom.sun.jndi.ldap.connect.pool.prefsize=5
+        -Dcom.sun.jndi.ldap.connect.pool.timeout=300000
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: bytebite_db
+      DB_USER: bytebite
+      DB_PASSWORD: bytebite_secure_pwd_123
+      LDAP_HOST: openldap
+      LDAP_PORT: 389
+      LDAP_BASE_DN: dc=bytebite,dc=local
+      LDAP_BIND_DN: cn=admin,dc=bytebite,dc=local
+      LDAP_BIND_PASSWORD: admin_secure_pwd_123
+      SSL_ENABLED: "true"
+      SSL_KEYSTORE_PATH: /usr/local/tomcat/conf/keystore.jks
+      SSL_KEYSTORE_PASSWORD: tomcat_keystore_pwd_123
+      FAILURE_INJECTION_ENABLED: "false"
+      LOG_LEVEL: INFO
+    ports:
+      - "8080:8080"
+      - "8443:8443"
+      - "8009:8009"
+    volumes:
+      - ./target/bytebite.war:/usr/local/tomcat/webapps/bytebite.war
+      - tomcat_logs:/usr/local/tomcat/logs
+      - ./docker/tomcat/server.xml:/usr/local/tomcat/conf/server.xml
+      - ./docker/tomcat/keystore.jks:/usr/local/tomcat/conf/keystore.jks
+    depends_on:
+      postgres:
+        condition: service_healthy
+      openldap:
+        condition: service_healthy
+    networks:
+      - bytebite-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/bytebite/"]
+      interval: 15s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped
+
+networks:
+  bytebite-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+    driver: local
+  openldap_data:
+    driver: local
+  openldap_config:
+    driver: local
+  tomcat_logs:
+    driver: local

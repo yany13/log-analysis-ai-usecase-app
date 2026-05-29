@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Context useNaming="true"
+         reloadable="false"
+         sessionCookiePath="/"
+         sessionCookieSecure="true"
+         sessionCookieHttpOnly="true"
+         sessionCookieSameSite="Strict">
+
+  <!-- Resource Links from Global Configuration -->
+  <ResourceLink name="jdbc/bytebite"
+                global="jdbc/bytebite"
+                type="javax.sql.DataSource" />
+
+  <ResourceLink name="ldap/bytebite"
+                global="ldap/bytebite"
+                type="com.sun.jndi.ldap.LdapCtxFactory" />
+
+  <!-- Session Persistence -->
+  <Manager pathname="SESSIONS.ser" />
+
+  <!-- Logging Configuration -->
+  <WatchedResource>WEB-INF/web.xml</WatchedResource>
+  <WatchedResource>WEB-INF/tomcat-web.xml</WatchedResource>
+  <WatchedResource>${catalina.base}/conf/web.xml</WatchedResource>
+
+  <!-- Security Constraint: Enforce HTTPS for sensitive paths -->
+  <SecurityConstraint>
+    <WebResourceCollection>
+      <WebResourceName>Sensitive Resources</WebResourceName>
+      <UrlPattern>/login</UrlPattern>
+      <UrlPattern>/api/*</UrlPattern>
+      <UrlPattern>/admin/*</UrlPattern>
+      <UrlPattern>/checkout/*</UrlPattern>
+    </WebResourceCollection>
+    <UserDataConstraint>
+      <TransportGuarantee>CONFIDENTIAL</TransportGuarantee>
+    </UserDataConstraint>
+  </SecurityConstraint>
+
+  <!-- CORS Headers (optional - can be handled in web.xml or servlet) -->
+  <Valve className="org.apache.catalina.valves.CorsValve"
+         allowedOrigins="*"
+         allowedMethods="GET,POST,PUT,DELETE,OPTIONS"
+         allowedHeaders="Content-Type,Authorization"
+         exposedHeaders="Authorization"
+         maxAge="3600"
+         allowCredentials="true" />
+
+</Context>
