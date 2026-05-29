@@ -1,0 +1,3 @@
+- [ByteBite Project Context](project-bytebite-context.md) — Book project: Java troubleshooting env with 5 togglable failure injection use cases
+- [User Role](user-role.md) — CTO/Solution Architect persona building an engineering book
+- [Feedback: Token Preservation](feedback-token-preservation.md) — Never output full boilerplate; snippets and architecture first
