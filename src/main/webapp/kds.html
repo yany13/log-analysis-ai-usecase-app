@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KDS - ByteBite</title>
+    <link rel="stylesheet" href="/bytebite/css/styles.css">
+    <style>
+        body {
+            background: #1a1a1a;
+            color: white;
+        }
+        .header {
+            background: #2a2a2a;
+            padding: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 3px solid #667eea;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 32px;
+        }
+        .stats-bar {
+            display: flex;
+            gap: 30px;
+        }
+        .stat-item {
+            text-align: center;
+        }
+        .stat-value {
+            font-size: 32px;
+            font-weight: bold;
+            color: #667eea;
+        }
+        .stat-label {
+            font-size: 12px;
+            color: #999;
+            text-transform: uppercase;
+        }
+        .container {
+            max-width: 100%;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .kds-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+        .order-ticket {
+            background: #2a2a2a;
+            border-left: 5px solid #667eea;
+            border-radius: 8px;
+            padding: 20px;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .order-ticket:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.3);
+        }
+        .order-ticket.priority-high {
+            border-left-color: #ff6b6b;
+            background: #3a2a2a;
+        }
+        .order-ticket.priority-medium {
+            border-left-color: #ffd93d;
+        }
+        .order-number {
+            font-size: 24px;
+            font-weight: bold;
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+        .order-time {
+            font-size: 12px;
+            color: #999;
+            margin-bottom: 15px;
+        }
+        .order-items {
+            background: #1a1a1a;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 15px;
+        }
+        .order-item {
+            padding: 8px;
+            margin-bottom: 8px;
+            background: #333;
+            border-left: 3px solid #667eea;
+            border-radius: 3px;
+            font-size: 14px;
+        }
+        .order-item .qty {
+            font-weight: bold;
+            color: #667eea;
+        }
+        .order-status {
+            background: #1a1a1a;
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 15px;
+            font-size: 12px;
+            color: #999;
+        }
+        .status-badge {
+            display: inline-block;
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-weight: 600;
+            font-size: 11px;
+        }
+        .status-new {
+            background: #667eea;
+            color: white;
+        }
+        .status-in-progress {
+            background: #ffd93d;
+            color: #1a1a1a;
+        }
+        .status-ready {
+            background: #5cdb6f;
+            color: white;
+        }
+        .order-actions {
+            display: flex;
+            gap: 10px;
+        }
+        .btn-small {
+            flex: 1;
+            padding: 10px;
+            border: none;
+            border-radius: 5px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        .btn-start {
+            background: #667eea;
+            color: white;
+        }
+        .btn-start:hover {
+            background: #764ba2;
+        }
+        .btn-ready {
+            background: #5cdb6f;
+            color: white;
+        }
+        .btn-ready:hover {
+            background: #4ab85f;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🍳 Kitchen Display System</h1>
+        <div class="stats-bar">
+            <div class="stat-item">
+                <div class="stat-value" id="totalOrders">0</div>
+                <div class="stat-label">Total</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value" id="newOrders">0</div>
+                <div class="stat-label">New</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value" id="inProgress">0</div>
+                <div class="stat-label">In Progress</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value" id="readyOrders">0</div>
+                <div class="stat-label">Ready</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="kds-grid" id="kdsGrid">
+            <div class="order-ticket">
+                <div class="order-number">ORD-001</div>
+                <div class="order-time">2 minutes ago</div>
+                <div class="order-items">
+                    <div class="order-item"><span class="qty">2x</span> Pizza Margherita</div>
+                    <div class="order-item"><span class="qty">1x</span> Caesar Salad</div>
+                </div>
+                <div class="order-status">
+                    <span class="status-badge status-new">NEW</span>
+                </div>
+                <div class="order-actions">
+                    <button class="btn-small btn-start" onclick="updateStatus('ORD-001', 'IN_PROGRESS')">Start</button>
+                    <button class="btn-small btn-ready" onclick="updateStatus('ORD-001', 'READY')">Ready</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/bytebite/js/kds.js"></script>
+</body>
+</html>
