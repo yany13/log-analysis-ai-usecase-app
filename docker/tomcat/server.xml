@@ -12,9 +12,9 @@
               auth="Container"
               type="javax.sql.DataSource"
               driverClassName="org.postgresql.Driver"
-              url="jdbc:postgresql://${env.DB_HOST}:${env.DB_PORT}/${env.DB_NAME}"
-              username="${env.DB_USER}"
-              password="${env.DB_PASSWORD}"
+              url="jdbc:postgresql://postgres:5432/bytebite_db"
+              username="bytebite"
+              password="bytebite_secure_pwd_123"
               maxTotal="20"
               maxIdle="10"
               maxWaitMillis="30000"
@@ -87,6 +87,19 @@
 
       <!-- ByteBite Application Host -->
       <Host name="localhost" appBase="webapps" unpackWARs="true" autoDeploy="true">
+
+        <!-- LDAP/JNDI Realm for container-managed authentication -->
+        <Realm className="org.apache.catalina.realm.JNDIRealm"
+               connectionURL="ldap://${env.LDAP_HOST:-openldap}:${env.LDAP_PORT:-389}"
+               connectionName="${env.LDAP_BIND_DN:-cn=admin,dc=bytebite,dc=local}"
+               connectionPassword="${env.LDAP_BIND_PASSWORD:-admin_secure_pwd_123}"
+               userPattern="uid={0},ou=people,${env.LDAP_BASE_DN:-dc=bytebite,dc=local}"
+               roleBase="ou=groups,${env.LDAP_BASE_DN:-dc=bytebite,dc=local}"
+               roleName="cn"
+               roleSearch="(member=uid={0},ou=people,${env.LDAP_BASE_DN:-dc=bytebite,dc=local})"
+               useAsRoles="false"
+               debug="0" />
+
         <!-- Context for ByteBite Application -->
         <Context path="/bytebite"
                  docBase="bytebite.war"

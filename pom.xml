@@ -54,6 +54,12 @@
             <artifactId>logback-classic</artifactId>
             <version>${logback.version}</version>
         </dependency>
+        <!-- SLF4J to Java Util Logging bridge (for Tomcat integration) -->
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-jdk14</artifactId>
+            <version>${slf4j.version}</version>
+        </dependency>
 
         <!-- JSON Processing -->
         <dependency>

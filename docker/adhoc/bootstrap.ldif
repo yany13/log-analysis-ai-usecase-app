@@ -1,30 +1,24 @@
 version: 1
-# ByteBite OpenLDAP Bootstrap Configuration
-# Base DN: dc=bytebite,dc=local
+# ByteBite LDAP Bootstrap Configuration
+# Organizational Units and Default Users
 
-# Domain Component
-dn: dc=bytebite,dc=local
-objectClass: top
-objectClass: dcObject
-objectClass: organization
-o: ByteBite
-dc: bytebite
-description: ByteBite Log Analysis AI Organization
-
-# Root Organization
+# Organizational Unit: People
 dn: ou=people,dc=bytebite,dc=local
 objectClass: top
 objectClass: organizationalUnit
 ou: people
 description: ByteBite Users
 
+# Organizational Unit: Groups
 dn: ou=groups,dc=bytebite,dc=local
 objectClass: top
 objectClass: organizationalUnit
 ou: groups
 description: ByteBite Groups
 
-# Admin User
+# ========================================
+# User: admin
+# ========================================
 dn: uid=admin,ou=people,dc=bytebite,dc=local
 objectClass: top
 objectClass: person
@@ -35,11 +29,13 @@ cn: Admin User
 sn: Administrator
 givenName: Admin
 mail: admin@bytebite.local
-userPassword: {SSHA}W6ph5Mm5Pz8GgiULbPgQ37lrDGQ1LCcP8h9qWV+3Ees=
+userPassword: admin
 ou: Administrators
 description: ByteBite System Administrator
 
-# Manager User
+# ========================================
+# User: manager
+# ========================================
 dn: uid=manager,ou=people,dc=bytebite,dc=local
 objectClass: top
 objectClass: person
@@ -50,11 +46,13 @@ cn: Manager User
 sn: Manager
 givenName: Manager
 mail: manager@bytebite.local
-userPassword: {SSHA}W6ph5Mm5Pz8GgiULbPgQ37lrDGQ1LCcP8h9qWV+3Ees=
+userPassword: admin
 ou: Management
 description: ByteBite Operations Manager
 
-# Staff User 1
+# ========================================
+# User: staff1
+# ========================================
 dn: uid=staff1,ou=people,dc=bytebite,dc=local
 objectClass: top
 objectClass: person
@@ -65,11 +63,13 @@ cn: Staff User One
 sn: Staff
 givenName: User One
 mail: staff1@bytebite.local
-userPassword: {SSHA}W6ph5Mm5Pz8GgiULbPgQ37lrDGQ1LCcP8h9qWV+3Ees=
+userPassword: admin
 ou: Staff
 description: ByteBite Staff Member
 
-# Staff User 2
+# ========================================
+# User: staff2
+# ========================================
 dn: uid=staff2,ou=people,dc=bytebite,dc=local
 objectClass: top
 objectClass: person
@@ -80,11 +80,13 @@ cn: Staff User Two
 sn: Staff
 givenName: User Two
 mail: staff2@bytebite.local
-userPassword: {SSHA}W6ph5Mm5Pz8GgiULbPgQ37lrDGQ1LCcP8h9qWV+3Ees=
+userPassword: admin
 ou: Staff
 description: ByteBite Staff Member
 
-# KDS Operator User
+# ========================================
+# User: kds_operator
+# ========================================
 dn: uid=kds_operator,ou=people,dc=bytebite,dc=local
 objectClass: top
 objectClass: person
@@ -95,11 +97,13 @@ cn: KDS Operator
 sn: Operator
 givenName: KDS
 mail: kds@bytebite.local
-userPassword: {SSHA}W6ph5Mm5Pz8GgiULbPgQ37lrDGQ1LCcP8h9qWV+3Ees=
+userPassword: admin
 ou: KDS
 description: Kitchen Display System Operator
 
-# Customer User
+# ========================================
+# User: customer1
+# ========================================
 dn: uid=customer1,ou=people,dc=bytebite,dc=local
 objectClass: top
 objectClass: person
@@ -110,11 +114,13 @@ cn: Customer User
 sn: Customer
 givenName: John
 mail: customer1@bytebite.local
-userPassword: {SSHA}W6ph5Mm5Pz8GgiULbPgQ37lrDGQ1LCcP8h9qWV+3Ees=
+userPassword: admin
 ou: Customers
 description: ByteBite Customer
 
-# Administrators Group
+# ========================================
+# Groups
+# ========================================
 dn: cn=administrators,ou=groups,dc=bytebite,dc=local
 objectClass: top
 objectClass: groupOfNames
@@ -122,7 +128,6 @@ cn: administrators
 member: uid=admin,ou=people,dc=bytebite,dc=local
 description: ByteBite Administrators
 
-# Managers Group
 dn: cn=managers,ou=groups,dc=bytebite,dc=local
 objectClass: top
 objectClass: groupOfNames
@@ -130,7 +135,6 @@ cn: managers
 member: uid=manager,ou=people,dc=bytebite,dc=local
 description: ByteBite Managers
 
-# Staff Group
 dn: cn=staff,ou=groups,dc=bytebite,dc=local
 objectClass: top
 objectClass: groupOfNames
@@ -139,7 +143,6 @@ member: uid=staff1,ou=people,dc=bytebite,dc=local
 member: uid=staff2,ou=people,dc=bytebite,dc=local
 description: ByteBite Staff Members
 
-# KDS Group
 dn: cn=kds,ou=groups,dc=bytebite,dc=local
 objectClass: top
 objectClass: groupOfNames
@@ -147,7 +150,6 @@ cn: kds
 member: uid=kds_operator,ou=people,dc=bytebite,dc=local
 description: Kitchen Display System Operators
 
-# Customers Group
 dn: cn=customers,ou=groups,dc=bytebite,dc=local
 objectClass: top
 objectClass: groupOfNames

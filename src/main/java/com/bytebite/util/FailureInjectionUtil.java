@@ -6,14 +6,12 @@ import jakarta.servlet.http.HttpServletRequest;
 
 /**
  * Failure Injection Utility
- * Provides centralized control for intentional failure injection in troubleshooting scenarios
+ * Provides centralized control for intentional failure injection via HTTP request parameters
  */
 public class FailureInjectionUtil {
     private static final Logger logger = LoggerFactory.getLogger(FailureInjectionUtil.class);
 
-    private static final String GLOBAL_FAILURE_INJECTION_KEY = "failure.injection.enabled";
-    private static final String REQUEST_PARAM_KEY = "injectFailure";
-    private static final String REQUEST_PARAM_TYPE = "failureType";
+    private static final String FAILURE_TYPE_PARAM = "failureType";
 
     // Failure type constants
     public static final String FAILURE_DB_LEAK = "db_leak";
@@ -23,44 +21,25 @@ public class FailureInjectionUtil {
     public static final String FAILURE_SSL = "ssl";
 
     /**
-     * Check if failure injection is globally enabled via environment or system property
+     * Get the failure type requested via HTTP parameter
      */
-    public static boolean isGloballyEnabled() {
-        String enabled = System.getenv("FAILURE_INJECTION_ENABLED");
-        if (enabled == null) {
-            enabled = System.getProperty(GLOBAL_FAILURE_INJECTION_KEY, "false");
-        }
-        return "true".equalsIgnoreCase(enabled);
+    public static String getFailureType(HttpServletRequest request) {
+        return request.getParameter(FAILURE_TYPE_PARAM);
     }
 
     /**
-     * Check if failure injection is requested via request parameter
-     * Request parameter overrides global setting
+     * Check if any failure injection is requested
      */
-    public static boolean isFailureInjectionRequested(HttpServletRequest request) {
-        String injectParam = request.getParameter(REQUEST_PARAM_KEY);
-        if (injectParam != null) {
-            return "true".equalsIgnoreCase(injectParam);
-        }
-        return isGloballyEnabled();
-    }
-
-    /**
-     * Get the specific failure type requested, if any
-     */
-    public static String getRequestedFailureType(HttpServletRequest request) {
-        return request.getParameter(REQUEST_PARAM_TYPE);
+    public static boolean isFailureRequested(HttpServletRequest request) {
+        return getFailureType(request) != null;
     }
 
     /**
      * Check if a specific failure type is requested
      */
-    public static boolean isSpecificFailureRequested(HttpServletRequest request, String failureType) {
-        if (!isFailureInjectionRequested(request)) {
-            return false;
-        }
-        String requested = getRequestedFailureType(request);
-        return failureType.equals(requested);
+    public static boolean isFailureType(HttpServletRequest request, String failureType) {
+        String requestedFailure = getFailureType(request);
+        return failureType.equals(requestedFailure);
     }
 
     /**

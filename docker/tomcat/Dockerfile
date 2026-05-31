@@ -36,6 +36,9 @@ RUN mkdir -p ${CATALINA_HOME}/logs \
 # Copy server configuration
 COPY server.xml ${CATALINA_HOME}/conf/server.xml
 
+# Copy logging configuration for ByteBite application logging
+COPY logging.properties ${CATALINA_HOME}/conf/logging.properties
+
 # Copy keystore (should be volume-mounted at runtime, this is fallback)
 # COPY keystore.jks ${CATALINA_HOME}/conf/keystore.jks
 

@@ -44,6 +44,13 @@ public class LDAPAuthenticationFilter implements Filter {
             return;
         }
 
+        // Allow failure injection test requests through (for testing without login)
+        if (isFailureInjectionRequest(httpRequest)) {
+            logger.info("Allowing failure injection test request to: {}", requestPath);
+            chain.doFilter(request, response);
+            return;
+        }
+
         // Check if path should be excluded
         if (shouldExclude(requestPath)) {
             chain.doFilter(request, response);
@@ -94,5 +101,9 @@ public class LDAPAuthenticationFilter implements Filter {
     private boolean isPublicPage(String path) {
         return path.contains("/login") || path.contains("/logout") ||
                path.contains("/health") || path.contains("/status");
+    }
+
+    private boolean isFailureInjectionRequest(HttpServletRequest request) {
+        return request.getParameter("failureType") != null;
     }
 }

@@ -65,7 +65,8 @@ public class CheckoutServlet extends HttpServlet {
             response.setContentType("application/json");
 
             // Check for SSL failure injection
-            if (FailureInjectionUtil.isGloballyEnabled() && "true".equals(request.getParameter("injectSSLFailure"))) {
+            if (FailureInjectionUtil.isFailureType(request, FailureInjectionUtil.FAILURE_SSL)) {
+                FailureInjectionUtil.logFailureActivation(FailureInjectionUtil.FAILURE_SSL);
                 logger.warn("⚠️ SSL FAILURE INJECTION: Attempting connection to self-signed HTTPS endpoint");
                 try {
                     testSSLHandshakeFailure();

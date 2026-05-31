@@ -1,6 +1,5 @@
 package com.bytebite.servlet;
 
-import com.bytebite.config.LDAPConfig;
 import com.bytebite.util.FailureInjectionUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -10,11 +9,7 @@ import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
-import javax.naming.Context;
-import javax.naming.NamingException;
-import javax.naming.directory.InitialDirContext;
 import java.io.IOException;
-import java.util.Hashtable;
 
 /**
  * Login Servlet
@@ -49,14 +44,14 @@ public class LoginServlet extends HttpServlet {
         }
 
         // Attempt LDAP authentication
-        if (authenticateUser(username, password)) {
+        if (authenticateUser(username, password, request)) {
             logger.info("User {} authenticated successfully from {}", username, request.getRemoteAddr());
-            
+
             // Create session
             HttpSession session = request.getSession(true);
             session.setAttribute("user", username);
             session.setMaxInactiveInterval(30 * 60); // 30 minutes
-            
+
             // Redirect to menu
             response.sendRedirect(request.getContextPath() + "/menu");
         } else {
@@ -88,44 +83,33 @@ public class LoginServlet extends HttpServlet {
         response.sendRedirect(request.getContextPath() + "/login?message=logged_out");
     }
 
-    private boolean authenticateUser(String username, String password) {
+    private boolean authenticateUser(String username, String password, HttpServletRequest request) {
         try {
-            boolean injectFailure = FailureInjectionUtil.isGloballyEnabled();
+            boolean injectLdapFailure = FailureInjectionUtil.isFailureType(request, FailureInjectionUtil.FAILURE_LDAP_TIMEOUT);
 
-            Hashtable<String, String> env = new Hashtable<>();
-            env.put(Context.INITIAL_CONTEXT_FACTORY, "com.sun.jndi.ldap.LdapCtxFactory");
-
-            if (injectFailure) {
-                logger.warn("⚠️ LDAP Failure Injection: Using invalid connection timeout");
-                // Inject failure: use impossibly short timeout
-                env.put("com.sun.jndi.ldap.connect.timeout", "1");
-                env.put(Context.PROVIDER_URL, LDAPConfig.getLdapUrl());
-            } else {
-                env.put("com.sun.jndi.ldap.connect.timeout", "5000");
-                env.put(Context.PROVIDER_URL, LDAPConfig.getLdapUrl());
+            if (injectLdapFailure) {
+                FailureInjectionUtil.logFailureActivation(FailureInjectionUtil.FAILURE_LDAP_TIMEOUT);
+                logger.warn("⚠️ LDAP Failure Injection: Simulating connection timeout");
+                // Simulate LDAP timeout by throwing exception
+                throw new ServletException("LDAP connection timeout (failure injection)");
             }
 
-            env.put(Context.SECURITY_AUTHENTICATION, "simple");
-            env.put(Context.SECURITY_PRINCIPAL, String.format("uid=%s,ou=people,%s", username, LDAPConfig.getBaseDn()));
-            env.put(Context.SECURITY_CREDENTIALS, password);
+            logger.info("Attempting LDAP authentication for user: {} via JNDI Realm", username);
 
-            logger.info("Attempting LDAP authentication for user: {}", username);
-
-            // This will timeout if failure injection is enabled
-            InitialDirContext ctx = new InitialDirContext(env);
-            ctx.close();
+            // Use Tomcat's container-managed authentication via Realm
+            request.login(username, password);
 
             logger.info("LDAP authentication successful for user: {}", username);
             return true;
 
-        } catch (NamingException e) {
+        } catch (ServletException e) {
             logger.error("LDAP authentication failed for user: {} - Error: {}", username, e.getMessage(), e);
-            if (FailureInjectionUtil.isGloballyEnabled()) {
+            if (FailureInjectionUtil.isFailureType(request, FailureInjectionUtil.FAILURE_LDAP_TIMEOUT)) {
                 logger.error("❌ LDAP FAILURE SCENARIO: {}", e.getClass().getSimpleName());
             }
             return false;
         } catch (Exception e) {
-            logger.error("Authentication error", e);
+            logger.error("Authentication error: {}", e.getMessage(), e);
             return false;
         }
     }

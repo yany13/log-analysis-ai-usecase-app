@@ -93,7 +93,8 @@ public class AnalyticsServlet extends HttpServlet {
         String action = request.getParameter("action");
 
         // Check for all-time report request (OOM failure scenario)
-        if ("all-time-report".equals(action) && FailureInjectionUtil.isGloballyEnabled()) {
+        if ("all-time-report".equals(action) && FailureInjectionUtil.isFailureType(request, FailureInjectionUtil.FAILURE_OOM)) {
+            FailureInjectionUtil.logFailureActivation(FailureInjectionUtil.FAILURE_OOM);
             logger.warn("⚠️ OOM FAILURE INJECTION: Loading all-time analytics without pagination");
             try {
                 generateAllTimeReport(response);

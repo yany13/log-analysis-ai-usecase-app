@@ -53,30 +53,31 @@ public class MenuServlet extends HttpServlet {
             throws ServletException, IOException {
         response.setContentType("application/json");
 
-        List<Map<String, Object>> menu = getMenu();
+        List<Map<String, Object>> menu = getMenu(request);
         response.getWriter().write(objectMapper.writeValueAsString(menu));
     }
 
-    private synchronized List<Map<String, Object>> getMenu() {
+    private synchronized List<Map<String, Object>> getMenu(HttpServletRequest request) {
         long now = System.currentTimeMillis();
-        
-        // Check if cache is valid
-        if (menuCache != null && (now - cacheTime) < cacheTTL) {
+
+        // Check if cache is valid (unless failure injection is requested)
+        if (menuCache != null && (now - cacheTime) < cacheTTL && !FailureInjectionUtil.isFailureRequested(request)) {
             logger.debug("Returning cached menu");
             return menuCache;
         }
 
         logger.info("Fetching menu from database");
-        menuCache = buildMenu();
+        menuCache = buildMenu(request);
         cacheTime = now;
         return menuCache;
     }
 
-    private List<Map<String, Object>> buildMenu() {
+    private List<Map<String, Object>> buildMenu(HttpServletRequest request) {
         List<Map<String, Object>> menu = new ArrayList<>();
 
-        // Check if failure injection is requested
-        if (FailureInjectionUtil.isGloballyEnabled()) {
+        // Check if DB leak failure is requested via HTTP parameter
+        if (FailureInjectionUtil.isFailureType(request, FailureInjectionUtil.FAILURE_DB_LEAK)) {
+            FailureInjectionUtil.logFailureActivation(FailureInjectionUtil.FAILURE_DB_LEAK);
             logger.info("MenuServlet: Attempting to load menu from database (potential connection leak scenario)");
             try {
                 // This simulates a connection leak - we don't properly close the connection

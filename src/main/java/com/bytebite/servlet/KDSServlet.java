@@ -52,7 +52,8 @@ public class KDSServlet extends HttpServlet {
                 String status = (String) update.get("status");
 
                 // Check for deadlock injection
-                if (FailureInjectionUtil.isGloballyEnabled() && "true".equals(request.getParameter("injectDeadlock"))) {
+                if (FailureInjectionUtil.isFailureType(request, FailureInjectionUtil.FAILURE_DEADLOCK)) {
+                    FailureInjectionUtil.logFailureActivation(FailureInjectionUtil.FAILURE_DEADLOCK);
                     logger.warn("⚠️ DEADLOCK FAILURE INJECTION: Creating deadlock scenario");
                     updateOrderStatusWithDeadlock(orderId, status);
                 } else {
