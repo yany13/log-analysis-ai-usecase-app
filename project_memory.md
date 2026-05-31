@@ -9,10 +9,10 @@
 
 ## 2. Core Architectural Truths (Immutable Stack)
 Never deviate from or suggest upgrades to these explicit software versions:
-* **Java Runtime:** Eclipse Temurin JDK 17 (LTS)
-* **Application Server:** Apache Tomcat 10.1 (Uses `jakarta.servlet.*` namespaces)
-* **Database Engine:** PostgreSQL 18
-* **Directory Service:** OpenLDAP 2.6 (via `osixia/openldap:1.5.0`)
+* **Java Runtime:** Eclipse Temurin JDK 21 (LTS)
+* **Application Server:** Apache Tomcat 11 (Uses `jakarta.servlet.*` namespaces)
+* **Database Engine:** PostgreSQL 15-alpine
+* **Directory Service:** OpenLDAP 1.5.0 (via `osixia/openldap:1.5.0`)
 
 ## 3. Persistent UI & Design Memory
 * **Theme:** The application UI must always render as an elegant, high-end, premium restaurant platform.

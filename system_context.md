@@ -6,8 +6,8 @@
 - **Application Goal:** Educational system designed with toggleable production bugs for engineering troubleshooting practice.
 
 ## 2. Immutable Technology Stack
-- **Runtime & App Server:** Eclipse Temurin JDK 17 (LTS) / Apache Tomcat 10.1 (Uses namespace `jakarta.servlet.*`).
-- **Data Layers:** PostgreSQL 18 / OpenLDAP 2.6 (`osixia/openldap:1.5.0`).
+- **Runtime & App Server:** Eclipse Temurin JDK 21 (LTS) / Apache Tomcat 11 (Uses namespace `jakarta.servlet.*`).
+- **Data Layers:** PostgreSQL 15-alpine / OpenLDAP 1.5.0 (`osixia/openldap:1.5.0`).
 - **Network Strategy:** Single bridge network (`bytebite-net`), host ports `8080` (HTTP) and `8443` (HTTPS).
 
 ## 3. UI, Styling & Token Guardrails

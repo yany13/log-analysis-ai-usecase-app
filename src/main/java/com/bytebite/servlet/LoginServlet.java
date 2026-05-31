@@ -1,21 +1,25 @@
 package com.bytebite.servlet;
 
+import com.bytebite.config.LDAPConfig;
+import com.bytebite.util.FailureInjectionUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.servlet.ServletException;
-import javax.servlet.annotation.WebServlet;
-import javax.servlet.http.HttpServlet;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-import javax.servlet.http.HttpSession;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServlet;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpSession;
+import javax.naming.Context;
+import javax.naming.NamingException;
+import javax.naming.directory.InitialDirContext;
 import java.io.IOException;
+import java.util.Hashtable;
 
 /**
  * Login Servlet
  * Handles user authentication via LDAP and session management
  */
-@WebServlet(urlPatterns = {"/login", "/logout"}, asyncSupported = true)
 public class LoginServlet extends HttpServlet {
     private static final Logger logger = LoggerFactory.getLogger(LoginServlet.class);
 
@@ -70,9 +74,7 @@ public class LoginServlet extends HttpServlet {
             return;
         }
 
-        // Display login form
-        response.setContentType("text/html; charset=UTF-8");
-        response.getWriter().println(getLoginFormHTML(request));
+        request.getRequestDispatcher("/login/form.html").forward(request, response);
     }
 
     private void handleLogout(HttpServletRequest request, HttpServletResponse response)
@@ -88,60 +90,44 @@ public class LoginServlet extends HttpServlet {
 
     private boolean authenticateUser(String username, String password) {
         try {
-            // LDAP authentication would be implemented here
-            // For now, accept admin/admin for testing
-            return "admin".equals(username) && "admin".equals(password);
+            boolean injectFailure = FailureInjectionUtil.isGloballyEnabled();
+
+            Hashtable<String, String> env = new Hashtable<>();
+            env.put(Context.INITIAL_CONTEXT_FACTORY, "com.sun.jndi.ldap.LdapCtxFactory");
+
+            if (injectFailure) {
+                logger.warn("⚠️ LDAP Failure Injection: Using invalid connection timeout");
+                // Inject failure: use impossibly short timeout
+                env.put("com.sun.jndi.ldap.connect.timeout", "1");
+                env.put(Context.PROVIDER_URL, LDAPConfig.getLdapUrl());
+            } else {
+                env.put("com.sun.jndi.ldap.connect.timeout", "5000");
+                env.put(Context.PROVIDER_URL, LDAPConfig.getLdapUrl());
+            }
+
+            env.put(Context.SECURITY_AUTHENTICATION, "simple");
+            env.put(Context.SECURITY_PRINCIPAL, String.format("uid=%s,ou=people,%s", username, LDAPConfig.getBaseDn()));
+            env.put(Context.SECURITY_CREDENTIALS, password);
+
+            logger.info("Attempting LDAP authentication for user: {}", username);
+
+            // This will timeout if failure injection is enabled
+            InitialDirContext ctx = new InitialDirContext(env);
+            ctx.close();
+
+            logger.info("LDAP authentication successful for user: {}", username);
+            return true;
+
+        } catch (NamingException e) {
+            logger.error("LDAP authentication failed for user: {} - Error: {}", username, e.getMessage(), e);
+            if (FailureInjectionUtil.isGloballyEnabled()) {
+                logger.error("❌ LDAP FAILURE SCENARIO: {}", e.getClass().getSimpleName());
+            }
+            return false;
         } catch (Exception e) {
             logger.error("Authentication error", e);
             return false;
         }
     }
 
-    private String getLoginFormHTML(HttpServletRequest request) {
-        String contextPath = request.getContextPath();
-        String errorMessage = request.getParameter("error");
-        String message = request.getParameter("message");
-
-        StringBuilder html = new StringBuilder();
-        html.append("<!DOCTYPE html>\n");
-        html.append("<html>\n");
-        html.append("<head>\n");
-        html.append("<title>ByteBite Login</title>\n");
-        html.append("<style>\n");
-        html.append("body { font-family: Arial, sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }\n");
-        html.append(".login-container { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 40px; border-radius: 10px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); width: 300px; }\n");
-        html.append("h1 { text-align: center; color: #333; }\n");
-        html.append("form { display: flex; flex-direction: column; }\n");
-        html.append("input { padding: 10px; margin: 10px 0; border: 1px solid #ddd; border-radius: 5px; }\n");
-        html.append("button { padding: 10px; margin: 20px 0; background: #667eea; color: white; border: none; border-radius: 5px; cursor: pointer; }\n");
-        html.append("button:hover { background: #764ba2; }\n");
-        html.append(".error { color: red; text-align: center; margin: 10px 0; }\n");
-        html.append("</style>\n");
-        html.append("</head>\n");
-        html.append("<body>\n");
-        html.append("<div class='login-container'>\n");
-        html.append("<h1>ByteBite</h1>\n");
-        
-        if ("logged_out".equals(message)) {
-            html.append("<p style='text-align:center; color: green;'>You have been logged out successfully</p>\n");
-        }
-        
-        if ("authentication_failed".equals(errorMessage)) {
-            html.append("<p class='error'>Invalid username or password</p>\n");
-        } else if ("invalid_credentials".equals(errorMessage)) {
-            html.append("<p class='error'>Please enter both username and password</p>\n");
-        }
-        
-        html.append("<form method='POST' action='").append(contextPath).append("/login'>\n");
-        html.append("<input type='text' name='username' placeholder='Username' required>\n");
-        html.append("<input type='password' name='password' placeholder='Password' required>\n");
-        html.append("<button type='submit'>Login</button>\n");
-        html.append("</form>\n");
-        html.append("<p style='text-align: center; font-size: 12px;'>Test: admin/admin</p>\n");
-        html.append("</div>\n");
-        html.append("</body>\n");
-        html.append("</html>\n");
-
-        return html.toString();
-    }
 }

@@ -17,7 +17,7 @@ services:
     networks:
       - bytebite-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U bytebite"]
+      test: ["CMD-SHELL", "pg_isready -U bytebite -d bytebite_db -h localhost -p 5432"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -37,17 +37,18 @@ services:
       LDAP_READONLY_USER: true
       LDAP_READONLY_USER_USERNAME: readonly
       LDAP_READONLY_USER_PASSWORD: readonly_secure_pwd_123
+      LDAP_TLS: "false"
     ports:
       - "389:389"
-      - "636:636"
+    #  - "636:636"
     volumes:
       - openldap_data:/var/lib/ldap
       - openldap_config:/etc/ldap/slapd.d
-      - ./docker/openldap/bootstrap.ldif:/container/service/slapd/assets/config/bootstrap/ldif/custom/bootstrap.ldif
+     # - ./docker/openldap/bootstrap.ldif:/container/service/slapd/assets/config/bootstrap/ldif/custom/bootstrap.ldif
     networks:
       - bytebite-network
     healthcheck:
-      test: ["CMD", "ldapsearch", "-x", "-b", "dc=bytebite,dc=local"]
+      test: ["CMD", "ldapsearch", "-x", "-b", "dc=bytebite,dc=local" , "-D", "cn=admin,dc=bytebite,dc=local", "-w", "admin_secure_pwd_123", "(objectClass=*)"]      
       interval: 10s
       timeout: 5s
       retries: 5
@@ -60,11 +61,11 @@ services:
       dockerfile: Dockerfile
     container_name: bytebite-tomcat
     environment:
-      JAVA_OPTS: >
-        -Dcom.sun.jndi.ldap.connect.pool=true
-        -Dcom.sun.jndi.ldap.connect.pool.maxsize=20
-        -Dcom.sun.jndi.ldap.connect.pool.prefsize=5
-        -Dcom.sun.jndi.ldap.connect.pool.timeout=300000
+    #  JAVA_OPTS: >
+     #   -Dcom.sun.jndi.ldap.connect.pool=true
+      #  -Dcom.sun.jndi.ldap.connect.pool.maxsize=20
+       # -Dcom.sun.jndi.ldap.connect.pool.prefsize=5
+        #-Dcom.sun.jndi.ldap.connect.pool.timeout=300000
       DB_HOST: postgres
       DB_PORT: 5432
       DB_NAME: bytebite_db

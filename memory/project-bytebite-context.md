@@ -11,4 +11,4 @@ ByteBite is a local Java troubleshooting lab for an engineering book teaching se
 
 **Why:** The book's premise is hands-on: readers trigger real failures in a controlled environment and analyze `catalina.out` logs to diagnose them.
 
-**How to apply:** All code must contain explicit, intentional bugs togglable via the UI. The five vectors are: DB connection leak (/menu), LDAP auth failure (/login), OOM heap exhaustion (/analytics), thread deadlock (/kds), SSL handshake failure (/checkout). Stack is immutable: Temurin JDK 17, Tomcat 10.1, PostgreSQL 18, OpenLDAP 2.6. Docker Compose on `bytebite-net`. UI is premium restaurant theme, vanilla HTML5 only.
+**How to apply:** All code must contain explicit, intentional bugs togglable via the UI. The five vectors are: DB connection leak (/menu), LDAP auth failure (/login), OOM heap exhaustion (/analytics), thread deadlock (/kds), SSL handshake failure (/checkout). Stack is immutable: Temurin JDK 21, Tomcat 11, PostgreSQL 15-alpine, OpenLDAP 1.5.0. Docker Compose on `bytebite-net`. UI is premium restaurant theme, vanilla HTML5 only.

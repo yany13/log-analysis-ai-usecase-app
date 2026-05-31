@@ -1,4 +1,4 @@
-FROM tomcat:11.0-jdk21-temurin
+FROM tomcat:10-jdk21-temurin
 
 # Set metadata
 LABEL maintainer="ByteBite Team"
@@ -41,7 +41,7 @@ COPY server.xml ${CATALINA_HOME}/conf/server.xml
 
 # Copy context configuration for bytebite app (optional - for specific app config)
 RUN mkdir -p ${CATALINA_HOME}/conf/Catalina/localhost
-COPY context.xml ${CATALINA_HOME}/conf/Catalina/localhost/bytebite.xml || true
+COPY context.xml ${CATALINA_HOME}/conf/Catalina/localhost/bytebite.xml 
 
 # Set correct permissions
 RUN chmod -R 755 ${CATALINA_HOME}/logs \
@@ -50,9 +50,11 @@ RUN chmod -R 755 ${CATALINA_HOME}/logs \
     && chmod 644 ${CATALINA_HOME}/conf/server.xml
 
 # Copy startup script
-COPY startup.sh ${CATALINA_HOME}/bin/startup.sh
-RUN chmod +x ${CATALINA_HOME}/bin/startup.sh \
-    && chmod +x ${CATALINA_HOME}/bin/catalina.sh
+# COPY startup.sh ${CATALINA_HOME}/bin/startup.sh
+# RUN chmod +x ${CATALINA_HOME}/bin/startup.sh \
+#    && chmod +x ${CATALINA_HOME}/bin/catalina.sh
+
+RUN chmod +x ${CATALINA_HOME}/bin/catalina.sh
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \

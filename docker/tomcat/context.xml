@@ -11,10 +11,6 @@
                 global="jdbc/bytebite"
                 type="javax.sql.DataSource" />
 
-  <ResourceLink name="ldap/bytebite"
-                global="ldap/bytebite"
-                type="com.sun.jndi.ldap.LdapCtxFactory" />
-
   <!-- Session Persistence -->
   <Manager pathname="SESSIONS.ser" />
 
@@ -23,7 +19,8 @@
   <WatchedResource>WEB-INF/tomcat-web.xml</WatchedResource>
   <WatchedResource>${catalina.base}/conf/web.xml</WatchedResource>
 
-  <!-- Security Constraint: Enforce HTTPS for sensitive paths -->
+  <!-- Security Constraint: Enforce HTTPS for sensitive paths (disabled for dev) -->
+  <!-- Enable in production environment
   <SecurityConstraint>
     <WebResourceCollection>
       <WebResourceName>Sensitive Resources</WebResourceName>
@@ -36,6 +33,7 @@
       <TransportGuarantee>CONFIDENTIAL</TransportGuarantee>
     </UserDataConstraint>
   </SecurityConstraint>
+  -->
 
   <!-- CORS Headers (optional - can be handled in web.xml or servlet) -->
   <Valve className="org.apache.catalina.valves.CorsValve"

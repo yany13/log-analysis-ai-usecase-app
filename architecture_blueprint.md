@@ -6,10 +6,10 @@ You are an Enterprise Solution Architect and CTO. This document defines the core
 All components must run on a single local developer workstation managed by a unified `docker-compose.yml` file.
 
 ### Physical Software Stack & Explicit Versions:
-* **Application Runtime:** Apache Tomcat v10.1.x
-* **Java Development Kit:** Eclipse Temurin JDK 17 (LTS)
-* **Database Engine:** PostgreSQL v18.x (Official Alpine-based image)
-* **Directory Service (IAM):** OpenLDAP v2.6.x (via `osixia/openldap:1.5.0` wrapper)
+* **Application Runtime:** Apache Tomcat v11 (JDK 21 Temurin)
+* **Java Development Kit:** Eclipse Temurin JDK 21 (LTS)
+* **Database Engine:** PostgreSQL v15-alpine (Official Alpine-based image)
+* **Directory Service (IAM):** OpenLDAP v1.5.0 (via `osixia/openldap:1.5.0`)
 
 ## 2. Component Layout & Network Topology
 * **Network:** Single isolated Docker bridge network (`bytebite-net`).
@@ -18,10 +18,18 @@ All components must run on a single local developer workstation managed by a uni
 * **OpenLDAP Service:** Exposes ports `389` (LDAP) and `636` (LDAPS) internally to the Tomcat container.
 
 ## 3. Core Database Schema & Static Data
-To maintain simplicity, the database utilizes a single schema with three minimal tables:
-1.  `users` (id, username, role)
-2.  `menu_items` (id, name, price, category, inventory_count)
-3.  `orders` (id, user_id, total_amount, status, timestamp)
+The database utilizes a single schema (`bytebite`) with eleven production-grade tables:
+1.  `users` - User profiles and authentication
+2.  `user_roles` - Role definitions
+3.  `user_role_mapping` - Role assignments
+4.  `sessions` - Session management
+5.  `orders` - Order information
+6.  `order_items` - Order line items
+7.  `kds_orders` - Kitchen display orders
+8.  `analytics_events` - Event tracking (JSONB)
+9.  `api_audit_log` - API call logging
+10. `application_logs` - Application events
+11. Additional tables indexed on common query columns
 
 ## 4. Log Delivery Target
 All standard output and Java stack traces must route natively to Tomcat's log stream.

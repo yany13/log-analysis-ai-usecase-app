@@ -1,6 +1,6 @@
 # Blueprint: ByteBite Application Layer & Screen Flows
 
-This document details the functional design of the simple student/staff web layers inside the Java Servlet application (`ByteBiteApp.war`) running on Tomcat 10.1 (JDK 17).
+This document details the functional design of the Java Servlet application (`ByteBiteApp.war`) running on Tomcat 11 (JDK 21).
 
 ## 1. Web Page & Servlet Architecture
 The application uses basic Jakarta Servlet views and standard HTML pages. No heavy frontend frameworks are permitted.

@@ -3,11 +3,11 @@ package com.bytebite.filter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.servlet.*;
-import javax.servlet.annotation.WebFilter;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-import javax.servlet.http.HttpSession;
+import jakarta.servlet.*;
+import jakarta.servlet.annotation.WebFilter;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpSession;
 import java.io.IOException;
 import java.util.regex.Pattern;
 
@@ -38,6 +38,12 @@ public class LDAPAuthenticationFilter implements Filter {
         HttpServletResponse httpResponse = (HttpServletResponse) response;
         String requestPath = httpRequest.getRequestURI();
 
+        // Exclude public pages from authentication
+        if (isPublicPage(requestPath)) {
+            chain.doFilter(request, response);
+            return;
+        }
+
         // Check if path should be excluded
         if (shouldExclude(requestPath)) {
             chain.doFilter(request, response);
@@ -47,8 +53,13 @@ public class LDAPAuthenticationFilter implements Filter {
         HttpSession session = httpRequest.getSession(false);
         String user = httpRequest.getRemoteUser();
 
+        // Check session attribute if getRemoteUser() is null
+        if (user == null && session != null) {
+            user = (String) session.getAttribute("user");
+        }
+
         // Check if user is authenticated
-        if (session == null || user == null) {
+        if (user == null) {
             logger.warn("Unauthenticated access attempt to: {}", requestPath);
             httpResponse.sendRedirect(httpRequest.getContextPath() + "/login");
             return;
@@ -56,7 +67,9 @@ public class LDAPAuthenticationFilter implements Filter {
 
         // Check session validity
         try {
-            session.getCreationTime(); // This will throw IllegalStateException if session is invalidated
+            if (session != null) {
+                session.getCreationTime(); // This will throw IllegalStateException if session is invalidated
+            }
             chain.doFilter(request, response);
         } catch (IllegalStateException e) {
             logger.warn("Invalid session for user: {}", user);
@@ -76,5 +89,10 @@ public class LDAPAuthenticationFilter implements Filter {
             }
         }
         return false;
+    }
+
+    private boolean isPublicPage(String path) {
+        return path.contains("/login") || path.contains("/logout") ||
+               path.contains("/health") || path.contains("/status");
     }
 }

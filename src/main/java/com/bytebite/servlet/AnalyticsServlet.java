@@ -1,15 +1,16 @@
 package com.bytebite.servlet;
 
+import com.bytebite.util.FailureInjectionUtil;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.servlet.ServletException;
-import javax.servlet.annotation.WebServlet;
-import javax.servlet.http.HttpServlet;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServlet;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.sql.Connection;
 import java.util.*;
 import java.util.concurrent.*;
 
@@ -17,7 +18,6 @@ import java.util.concurrent.*;
  * Analytics Servlet
  * Handles event tracking and analytics with batch processing
  */
-@WebServlet(urlPatterns = {"/analytics", "/api/analytics"}, asyncSupported = true)
 public class AnalyticsServlet extends HttpServlet {
     private static final Logger logger = LoggerFactory.getLogger(AnalyticsServlet.class);
     private ObjectMapper objectMapper = new ObjectMapper();
@@ -89,7 +89,23 @@ public class AnalyticsServlet extends HttpServlet {
     private void handleAPIAnalytics(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
         response.setContentType("application/json");
-        
+
+        String action = request.getParameter("action");
+
+        // Check for all-time report request (OOM failure scenario)
+        if ("all-time-report".equals(action) && FailureInjectionUtil.isGloballyEnabled()) {
+            logger.warn("⚠️ OOM FAILURE INJECTION: Loading all-time analytics without pagination");
+            try {
+                generateAllTimeReport(response);
+                return;
+            } catch (OutOfMemoryError e) {
+                logger.error("❌ OOM FAILURE SCENARIO TRIGGERED: {}", e.getMessage(), e);
+                response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+                response.getWriter().write("{\"error\": \"OutOfMemoryError: Java heap space\"}");
+                return;
+            }
+        }
+
         Map<String, Object> analytics = new HashMap<>();
         analytics.put("eventQueueSize", eventQueue.size());
         analytics.put("batchSize", batchSize);
@@ -100,8 +116,7 @@ public class AnalyticsServlet extends HttpServlet {
 
     private void handleWebAnalytics(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
-        response.setContentType("text/html; charset=UTF-8");
-        response.getWriter().println(getAnalyticsPageHTML(request));
+        request.getRequestDispatcher("/analytics.html").forward(request, response);
     }
 
     private void processBatches() {
@@ -167,6 +182,62 @@ public class AnalyticsServlet extends HttpServlet {
         }
     }
 
+    private void generateAllTimeReport(HttpServletResponse response) throws IOException {
+        logger.info("Generating all-time analytics report - loading ALL data into memory");
+
+        // Global, unbounded list - intentionally causes OOM
+        List<Map<String, Object>> allEventsUnmanaged = new ArrayList<>();
+
+        try {
+            javax.naming.Context ctx = new javax.naming.InitialContext();
+            javax.sql.DataSource ds = (javax.sql.DataSource) ctx.lookup("java:comp/env/jdbc/bytebite");
+
+            try (Connection conn = ds.getConnection()) {
+                // NO LIMIT clause - loads ALL events ever created
+                String sql = "SELECT event_type, event_data, user_id, created_at FROM bytebite.analytics_events";
+                logger.warn("Executing unbounded query: {}", sql);
+
+                try (java.sql.Statement stmt = conn.createStatement();
+                     java.sql.ResultSet rs = stmt.executeQuery(sql)) {
+
+                    int count = 0;
+                    while (rs.next()) {
+                        Map<String, Object> event = new HashMap<>();
+                        event.put("eventType", rs.getString("event_type"));
+                        event.put("eventData", rs.getString("event_data"));
+                        event.put("userId", rs.getLong("user_id"));
+                        event.put("createdAt", rs.getTimestamp("created_at"));
+
+                        // Add duplicate data to accelerate OOM (simulate large payloads)
+                        byte[] largePayload = new byte[1024 * 100]; // 100KB per event
+                        event.put("payload", largePayload);
+
+                        allEventsUnmanaged.add(event);
+                        count++;
+
+                        if (count % 1000 == 0) {
+                            logger.warn("⚠️ Loaded {} events into memory (heap usage increasing)", count);
+                        }
+                    }
+
+                    logger.error("❌ Successfully loaded {} events into unbounded memory structure", count);
+                    // Events remain in memory - never released, causing heap exhaustion on next large report
+                }
+            }
+
+            response.setContentType("application/json");
+            response.getWriter().write(objectMapper.writeValueAsString(
+                Collections.singletonMap("totalEvents", allEventsUnmanaged.size())));
+
+        } catch (OutOfMemoryError e) {
+            throw e;
+        } catch (Exception e) {
+            logger.error("Error generating all-time report", e);
+            response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+            response.getWriter().write("{\"error\": \"" + e.getMessage() + "\"}");
+        }
+    }
+
     @Override
     public void destroy() {
         executor.shutdown();
@@ -180,40 +251,4 @@ public class AnalyticsServlet extends HttpServlet {
         logger.info("AnalyticsServlet destroyed");
     }
 
-    private String getAnalyticsPageHTML(HttpServletRequest request) {
-        StringBuilder html = new StringBuilder();
-        html.append("<!DOCTYPE html>\n");
-        html.append("<html>\n");
-        html.append("<head>\n");
-        html.append("<title>ByteBite Analytics</title>\n");
-        html.append("<style>\n");
-        html.append("body { font-family: Arial, sans-serif; background: #f5f5f5; padding: 20px; }\n");
-        html.append(".container { max-width: 1200px; margin: 0 auto; }\n");
-        html.append("h1 { text-align: center; color: #333; }\n");
-        html.append(".stats { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 20px; margin-top: 40px; }\n");
-        html.append(".stat-card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); text-align: center; }\n");
-        html.append(".stat-value { font-size: 32px; font-weight: bold; color: #667eea; }\n");
-        html.append(".stat-label { color: #999; margin-top: 10px; }\n");
-        html.append(".nav { margin-bottom: 20px; }\n");
-        html.append(".nav a { margin-right: 15px; text-decoration: none; color: #667eea; }\n");
-        html.append("</style>\n");
-        html.append("</head>\n");
-        html.append("<body>\n");
-        html.append("<div class='container'>\n");
-        html.append("<div class='nav'>\n");
-        html.append("<a href='").append(request.getContextPath()).append("/menu'>Menu</a>\n");
-        html.append("<a href='").append(request.getContextPath()).append("/logout'>Logout</a>\n");
-        html.append("</div>\n");
-        html.append("<h1>Analytics Dashboard</h1>\n");
-        html.append("<div class='stats'>\n");
-        html.append("<div class='stat-card'><div class='stat-value'>").append(eventQueue.size()).append("</div><div class='stat-label'>Queued Events</div></div>\n");
-        html.append("<div class='stat-card'><div class='stat-value'>").append(batchSize).append("</div><div class='stat-label'>Batch Size</div></div>\n");
-        html.append("<div class='stat-card'><div class='stat-value'>").append(batchTimeoutSeconds).append("s</div><div class='stat-label'>Batch Timeout</div></div>\n");
-        html.append("</div>\n");
-        html.append("</div>\n");
-        html.append("</body>\n");
-        html.append("</html>\n");
-
-        return html.toString();
-    }
 }

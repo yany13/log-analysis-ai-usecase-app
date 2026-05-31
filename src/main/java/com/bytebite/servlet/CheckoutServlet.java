@@ -1,15 +1,19 @@
 package com.bytebite.servlet;
 
+import com.bytebite.util.FailureInjectionUtil;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.servlet.ServletException;
-import javax.servlet.annotation.WebServlet;
-import javax.servlet.http.HttpServlet;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServlet;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLHandshakeException;
+import javax.net.ssl.HttpsURLConnection;
 import java.io.IOException;
+import java.net.URL;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.Timestamp;
@@ -22,7 +26,6 @@ import java.util.UUID;
  * Checkout Servlet
  * Handles order creation and transaction processing
  */
-@WebServlet(urlPatterns = {"/checkout", "/api/orders"}, asyncSupported = true)
 public class CheckoutServlet extends HttpServlet {
     private static final Logger logger = LoggerFactory.getLogger(CheckoutServlet.class);
     private ObjectMapper objectMapper = new ObjectMapper();
@@ -53,14 +56,31 @@ public class CheckoutServlet extends HttpServlet {
 
     private void handleCheckoutForm(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
-        response.setContentType("text/html; charset=UTF-8");
-        response.getWriter().println(getCheckoutFormHTML(request));
+        request.getRequestDispatcher("/checkout.html").forward(request, response);
     }
 
     private void handleAPIOrder(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
         try {
             response.setContentType("application/json");
+
+            // Check for SSL failure injection
+            if (FailureInjectionUtil.isGloballyEnabled() && "true".equals(request.getParameter("injectSSLFailure"))) {
+                logger.warn("⚠️ SSL FAILURE INJECTION: Attempting connection to self-signed HTTPS endpoint");
+                try {
+                    testSSLHandshakeFailure();
+                    // If we got here, SSL didn't fail (shouldn't happen in real scenario)
+                    logger.warn("SSL test endpoint did not fail as expected");
+                } catch (SSLHandshakeException e) {
+                    logger.error("❌ SSL HANDSHAKE FAILURE SCENARIO: {}", e.getMessage(), e);
+                    response.setStatus(HttpServletResponse.SC_BAD_GATEWAY);
+                    Map<String, String> error = new HashMap<>();
+                    error.put("status", "error");
+                    error.put("message", "SSL Certificate Validation Failed: " + e.getMessage());
+                    response.getWriter().write(objectMapper.writeValueAsString(error));
+                    return;
+                }
+            }
 
             // Parse request
             String body = new String(request.getInputStream().readAllBytes());
@@ -139,7 +159,7 @@ public class CheckoutServlet extends HttpServlet {
             try (Connection conn = ds.getConnection()) {
                 String sql = "INSERT INTO bytebite.orders (user_id, order_number, status, total_amount, order_date) " +
                             "VALUES (1, ?, 'PENDING', ?, ?)";
-                
+
                 try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
                     pstmt.setString(1, orderNumber);
                     pstmt.setDouble(2, ((Number) orderData.getOrDefault("totalAmount", 0)).doubleValue());
@@ -160,42 +180,37 @@ public class CheckoutServlet extends HttpServlet {
         return result;
     }
 
-    private String getCheckoutFormHTML(HttpServletRequest request) {
-        StringBuilder html = new StringBuilder();
-        html.append("<!DOCTYPE html>\n");
-        html.append("<html>\n");
-        html.append("<head>\n");
-        html.append("<title>ByteBite Checkout</title>\n");
-        html.append("<style>\n");
-        html.append("body { font-family: Arial, sans-serif; background: #f5f5f5; padding: 20px; }\n");
-        html.append(".checkout-container { max-width: 600px; margin: 0 auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }\n");
-        html.append("h1 { text-align: center; color: #333; }\n");
-        html.append("form { display: flex; flex-direction: column; }\n");
-        html.append("label { margin-top: 15px; color: #333; font-weight: bold; }\n");
-        html.append("input, textarea { padding: 10px; margin-top: 5px; border: 1px solid #ddd; border-radius: 4px; }\n");
-        html.append("button { padding: 12px; margin-top: 20px; background: #667eea; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; }\n");
-        html.append("button:hover { background: #764ba2; }\n");
-        html.append(".nav { margin-bottom: 20px; }\n");
-        html.append(".nav a { text-decoration: none; color: #667eea; }\n");
-        html.append("</style>\n");
-        html.append("</head>\n");
-        html.append("<body>\n");
-        html.append("<div class='checkout-container'>\n");
-        html.append("<div class='nav'><a href='").append(request.getContextPath()).append("/menu'>← Back to Menu</a></div>\n");
-        html.append("<h1>Checkout</h1>\n");
-        html.append("<form method='POST' action='").append(request.getContextPath()).append("/checkout'>\n");
-        html.append("<label for='itemCount'>Number of Items:</label>\n");
-        html.append("<input type='number' id='itemCount' name='itemCount' required>\n");
-        html.append("<label for='totalAmount'>Total Amount ($):</label>\n");
-        html.append("<input type='number' id='totalAmount' name='totalAmount' step='0.01' required>\n");
-        html.append("<label for='address'>Delivery Address:</label>\n");
-        html.append("<textarea id='address' name='address' rows='4' required></textarea>\n");
-        html.append("<button type='submit'>Place Order</button>\n");
-        html.append("</form>\n");
-        html.append("</div>\n");
-        html.append("</body>\n");
-        html.append("</html>\n");
+    /**
+     * Attempt to connect to an HTTPS endpoint with a self-signed certificate
+     * This will fail with SSLHandshakeException because the cert is not in the truststore
+     */
+    private void testSSLHandshakeFailure() throws IOException {
+        // Try to connect to a test HTTPS endpoint with self-signed cert
+        // This endpoint doesn't actually need to exist - the SSL handshake will fail first
+        String testUrl = "https://self-signed.example.com:8443/payment-gateway";
 
-        return html.toString();
+        logger.warn("Attempting HTTPS connection to: {}", testUrl);
+
+        try {
+            URL url = new URL(testUrl);
+            HttpsURLConnection conn = (HttpsURLConnection) url.openConnection();
+
+            // Set timeout to avoid hanging
+            conn.setConnectTimeout(5000);
+            conn.setReadTimeout(5000);
+
+            logger.info("Initiating SSL handshake with {}", url.getHost());
+            // This will trigger the SSL handshake and fail
+            conn.connect();
+
+            logger.error("Unexpected success connecting to {}", url);
+        } catch (SSLHandshakeException e) {
+            // Expected failure - re-throw to caller
+            throw e;
+        } catch (javax.net.ssl.SSLException e) {
+            // Re-wrap as SSLHandshakeException for clarity
+            throw new SSLHandshakeException("SSL handshake failed: " + e.getMessage());
+        }
     }
+
 }
