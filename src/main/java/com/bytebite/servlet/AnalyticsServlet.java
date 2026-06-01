@@ -48,76 +48,53 @@ public class AnalyticsServlet extends HttpServlet {
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
-        String path = request.getServletPath();
-
-        if (path.contains("api")) {
-            handleAPIAnalytics(request, response);
-        } else {
-            handleWebAnalytics(request, response);
-        }
+        request.getRequestDispatcher("/analytics.html").forward(request, response);
     }
 
     @Override
     protected void doPost(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
-        try {
-            String contentType = request.getContentType();
+        String contentType = request.getContentType();
 
-            if (contentType != null && contentType.contains("application/json")) {
-                String body = new String(request.getInputStream().readAllBytes());
-                Map<String, Object> event = objectMapper.readValue(body, Map.class);
+        if (contentType != null && contentType.contains("application/json")) {
+            String body = new String(request.getInputStream().readAllBytes());
+            Map<String, Object> payload = objectMapper.readValue(body, Map.class);
 
-                // Add event to queue
-                event.put("timestamp", System.currentTimeMillis());
-                event.put("user", request.getSession().getAttribute("user"));
-                event.put("ip", request.getRemoteAddr());
-
-                eventQueue.offer(event);
-
-                response.setContentType("application/json");
-                response.setStatus(HttpServletResponse.SC_ACCEPTED);
-                response.getWriter().write("{\"status\": \"received\"}");
-
-                logger.debug("Event queued: {}", event.get("eventType"));
+            // Check for all-time report request (OOM failure scenario)
+            String action = (String) payload.get("action");
+            String failureType = (String) payload.get("failureType");
+            if ("all-time-report".equals(action) && FailureInjectionUtil.FAILURE_OOM.equals(failureType)) {
+                FailureInjectionUtil.logFailureActivation(FailureInjectionUtil.FAILURE_OOM);
+                logger.warn("⚠️ OOM FAILURE INJECTION: Loading all-time analytics without pagination");
+                try {
+                    generateAllTimeReport(response);
+                    return;
+                } catch (OutOfMemoryError e) {
+                    logger.error("❌ OOM FAILURE SCENARIO TRIGGERED: {}", e.getMessage(), e);
+                    response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+                    response.setContentType("application/json");
+                    response.getWriter().write("{\"error\": \"OutOfMemoryError: Java heap space\"}");
+                    return;
+                }
             }
-        } catch (Exception e) {
-            logger.error("Error processing analytics event", e);
+
+            // Add event to queue
+            payload.put("timestamp", System.currentTimeMillis());
+            payload.put("user", request.getSession().getAttribute("user"));
+            payload.put("ip", request.getRemoteAddr());
+
+            eventQueue.offer(payload);
+
+            response.setContentType("application/json");
+            response.setStatus(HttpServletResponse.SC_ACCEPTED);
+            response.getWriter().write("{\"status\": \"received\"}");
+
+            logger.debug("Event queued: {}", payload.get("eventType"));
+        } else {
             response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+            response.setContentType("application/json");
+            response.getWriter().write("{\"error\": \"JSON body required\"}");
         }
-    }
-
-    private void handleAPIAnalytics(HttpServletRequest request, HttpServletResponse response)
-            throws ServletException, IOException {
-        response.setContentType("application/json");
-
-        String action = request.getParameter("action");
-
-        // Check for all-time report request (OOM failure scenario)
-        if ("all-time-report".equals(action) && FailureInjectionUtil.isFailureType(request, FailureInjectionUtil.FAILURE_OOM)) {
-            FailureInjectionUtil.logFailureActivation(FailureInjectionUtil.FAILURE_OOM);
-            logger.warn("⚠️ OOM FAILURE INJECTION: Loading all-time analytics without pagination");
-            try {
-                generateAllTimeReport(response);
-                return;
-            } catch (OutOfMemoryError e) {
-                logger.error("❌ OOM FAILURE SCENARIO TRIGGERED: {}", e.getMessage(), e);
-                response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
-                response.getWriter().write("{\"error\": \"OutOfMemoryError: Java heap space\"}");
-                return;
-            }
-        }
-
-        Map<String, Object> analytics = new HashMap<>();
-        analytics.put("eventQueueSize", eventQueue.size());
-        analytics.put("batchSize", batchSize);
-        analytics.put("timeout", batchTimeoutSeconds);
-
-        response.getWriter().write(objectMapper.writeValueAsString(analytics));
-    }
-
-    private void handleWebAnalytics(HttpServletRequest request, HttpServletResponse response)
-            throws ServletException, IOException {
-        request.getRequestDispatcher("/analytics.html").forward(request, response);
     }
 
     private void processBatches() {

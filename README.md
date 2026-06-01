@@ -1,32 +1,47 @@
-# ByteBite - Log Analysis AI Use Case Application
+# ByteBite - Hands-On Java Troubleshooting Lab
 
-A production-ready Java web application demonstrating enterprise restaurant order management with advanced logging, AI-powered analytics, LDAP authentication, PostgreSQL persistence, and containerized deployment.
+A controlled learning environment for debugging production Java failures. ByteBite is a restaurant order management system with **5 intentional, togglable failure injection vectors** designed to teach senior engineers how to diagnose real production issues through log analysis.
 
-## 🎯 Project Overview
+## 🎯 Project Purpose
 
-ByteBite is a modern restaurant order management system built with Java 11 and contemporary web technologies. It showcases enterprise architecture patterns including:
+ByteBite is an interactive troubleshooting laboratory for an advanced Java debugging book. Readers trigger engineered failures on specific endpoints and analyze `catalina.out` logs to diagnose root causes. The system mimics production enterprise patterns:
 
-- **Servlet-based MVC architecture** with clean separation of concerns
-- **LDAP-integrated authentication** with Tomcat Realm configuration
-- **PostgreSQL persistence** with connection pooling and transaction management
+- **Servlet-based MVC architecture** with deliberate failure points
+- **LDAP-integrated authentication** with triggerable auth failures
+- **PostgreSQL persistence** with engineered connection pool exhaustion
 - **Containerized deployment** using Docker Compose with health checks
-- **Comprehensive logging** with SLF4J/Logback for observability
+- **Comprehensive logging** with SLF4J/Logback for post-mortem analysis
 - **RESTful API design** with JSON responses
 - **Client-side state management** with localStorage and vanilla JavaScript
+
+## 🔴 Engineered Failure Vectors (Core Teaching Points)
+
+The 5 failure injection vectors simulate real production issues:
+
+| Endpoint | Failure Type | Root Cause | Learning Goal |
+|----------|--------------|-----------|----------------|
+| `/menu` | DB Connection Leak | HikariCP pool exhaustion | Diagnose connection pool depletion in logs |
+| `/login` | LDAP Auth Failure | Directory service unavailable | Identify auth timeout patterns |
+| `/analytics` | OOM Heap Exhaustion | Unbounded event buffering | Recognize memory pressure indicators |
+| `/kds` | Thread Deadlock | Order service + database circular lock | Detect thread contention in thread dumps |
+| `/checkout` | SSL Handshake Failure | Certificate validation error | Debug TLS/SSL negotiation issues |
 
 ## 📋 Quick Facts
 
 | Aspect | Details |
 |--------|---------|
+| **Purpose** | Hands-on troubleshooting lab (learning, not production) |
 | **Language** | Java 11 |
+| **JDK Runtime** | Temurin JDK 21 (in Docker) |
 | **Framework** | Jakarta Servlet API 6.0 |
 | **Frontend** | HTML5, CSS3, Vanilla JavaScript |
-| **Database** | PostgreSQL 15 with HikariCP |
-| **Authentication** | OpenLDAP (JNDI Realm) |
+| **Database** | PostgreSQL 15-alpine with HikariCP |
+| **Authentication** | OpenLDAP 1.5.0 (JNDI Realm) |
 | **Container Runtime** | Apache Tomcat 11 |
-| **Orchestration** | Docker Compose 3.8 |
+| **Orchestration** | Docker Compose 3.8 on `bytebite-net` |
 | **Testing** | JUnit 4.13.2 + Mockito 5.7.0 |
 | **Build Tool** | Maven 3.6+ |
+| **Failure Injection** | 5 togglable vectors via UI and environment variable |
 
 ## 🚀 Getting Started
 
@@ -50,9 +65,26 @@ docker-compose ps
 
 # 4. Access the application
 # Open browser: http://localhost:8080/bytebite/login
-# Username: admin
-# Password: admin
+# Username: admin | Password: admin
+
+# 5. Trigger failures and analyze logs
+# Monitor logs in real-time:
+docker-compose logs -f tomcat
 ```
+
+### Triggering Failures (For Troubleshooting Practice)
+
+To trigger each failure vector, pass the failure type as an HTTP request parameter:
+
+| Failure Vector | Trigger Method | Expected Log Output |
+|---|---|---|
+| **DB Connection Leak** (`/menu`) | `GET /api/menu?failureType=db_leak` | "CONNECTION LEAK: Statement closed but Connection kept open" |
+| **LDAP Auth Failure** (`/login`) | `POST /login?failureType=ldap_timeout` + credentials | "LDAP connection timeout (failure injection)" |
+| **OOM Heap Exhaustion** (`/analytics`) | `GET /api/analytics?action=all-time-report&failureType=oom` | "OutOfMemoryError: Java heap space" |
+| **Thread Deadlock** (`/kds`) | `POST /api/kds` with JSON `{"orderId":"X", "status":"Y", "failureType":"deadlock"}` | "DEADLOCK SCENARIO: Both threads are now BLOCKED" |
+| **SSL Handshake Failure** (`/checkout`) | `POST /checkout` with JSON `{"failureType":"ssl", ...}` | "SSL Certificate Validation Failed" |
+
+Observe `catalina.out` logs to diagnose the root cause.
 
 #### Default Credentials
 
@@ -451,7 +483,6 @@ SSL_KEYSTORE_PASSWORD: tomcat_keystore_pwd_123
 
 # Logging & Features
 LOG_LEVEL: INFO
-FAILURE_INJECTION_ENABLED: "false"
 ```
 
 ### Customization
@@ -573,19 +604,20 @@ docker-compose restart tomcat
 
 ## 📄 License
 
-ByteBite Application - Sample Use Case
+ByteBite - Advanced Java Troubleshooting Lab (Educational Use)
 
 ## 👥 Contributors
 
-AI-assisted development with current Git commit history.
+AI-assisted development for advanced Java debugging book.
 
-Stack: Java 11, Jakarta Servlet API, PostgreSQL, OpenLDAP, Docker, Vanilla JavaScript, Maven
+Stack: Temurin JDK 21, Java 11 Source, Jakarta Servlet API, PostgreSQL 15-alpine, OpenLDAP 1.5.0, Docker, Vanilla JavaScript, Maven
 
 ---
 
 **Version**: 1.0.0  
 **Last Updated**: June 2026  
-**Status**: Production Ready ✅  
-**Maintainer**: Development Team
+**Status**: Learning Lab ✓ (Not for Production)  
+**Purpose**: Hands-on failure analysis for senior engineers  
+**Maintainer**: Engineering Book Author (CTO/Solution Architect)
 
-For support or issues, check logs and review DEPLOYMENT.md troubleshooting section.
+For troubleshooting guidance, review `catalina.out` logs and see TESTING.md for log analysis patterns.

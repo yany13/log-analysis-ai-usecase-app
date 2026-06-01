@@ -35,64 +35,67 @@ public class MenuServlet extends HttpServlet {
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
-        String path = request.getServletPath();
-
-        if (path.contains("api")) {
-            handleAPIRequest(request, response);
-        } else {
-            handleWebRequest(request, response);
-        }
-    }
-
-    private void handleWebRequest(HttpServletRequest request, HttpServletResponse response)
-            throws ServletException, IOException {
         request.getRequestDispatcher("/menu.html").forward(request, response);
     }
 
-    private void handleAPIRequest(HttpServletRequest request, HttpServletResponse response)
+    @Override
+    protected void doPost(HttpServletRequest request, HttpServletResponse response)
+            throws ServletException, IOException {
+        String contentType = request.getContentType();
+
+        if (contentType != null && contentType.contains("application/json")) {
+            String body = new String(request.getInputStream().readAllBytes());
+            Map<String, Object> payload = objectMapper.readValue(body, Map.class);
+            handleAPIRequest(payload, response);
+        } else {
+            response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+            response.getWriter().write("{\"error\": \"JSON body required\"}");
+        }
+    }
+
+    private void handleAPIRequest(Map<String, Object> payload, HttpServletResponse response)
             throws ServletException, IOException {
         response.setContentType("application/json");
 
-        List<Map<String, Object>> menu = getMenu(request);
+        String failureType = (String) payload.get("failureType");
+        List<Map<String, Object>> menu = getMenu(failureType);
         response.getWriter().write(objectMapper.writeValueAsString(menu));
     }
 
-    private synchronized List<Map<String, Object>> getMenu(HttpServletRequest request) {
+    private synchronized List<Map<String, Object>> getMenu(String failureType) {
         long now = System.currentTimeMillis();
 
         // Check if cache is valid (unless failure injection is requested)
-        if (menuCache != null && (now - cacheTime) < cacheTTL && !FailureInjectionUtil.isFailureRequested(request)) {
+        if (menuCache != null && (now - cacheTime) < cacheTTL && failureType == null) {
             logger.debug("Returning cached menu");
             return menuCache;
         }
 
         logger.info("Fetching menu from database");
-        menuCache = buildMenu(request);
+        menuCache = buildMenu(failureType);
         cacheTime = now;
         return menuCache;
     }
 
-    private List<Map<String, Object>> buildMenu(HttpServletRequest request) {
+    private List<Map<String, Object>> buildMenu(String failureType) {
         List<Map<String, Object>> menu = new ArrayList<>();
 
-        // Check if DB leak failure is requested via HTTP parameter
-        if (FailureInjectionUtil.isFailureType(request, FailureInjectionUtil.FAILURE_DB_LEAK)) {
+        // Check if DB leak failure is requested
+        if (FailureInjectionUtil.FAILURE_DB_LEAK.equals(failureType)) {
             FailureInjectionUtil.logFailureActivation(FailureInjectionUtil.FAILURE_DB_LEAK);
             logger.info("MenuServlet: Attempting to load menu from database (potential connection leak scenario)");
+
+            Connection leakedConn = null;
             try {
-                // This simulates a connection leak - we don't properly close the connection
                 javax.naming.Context ctx = new javax.naming.InitialContext();
                 javax.sql.DataSource ds = (javax.sql.DataSource) ctx.lookup("java:comp/env/jdbc/bytebite");
 
-                // INTENTIONAL BUG: Connection not closed - simulating leak
-                // In real scenario, repeated calls exhaust the connection pool
-                Connection conn = ds.getConnection();
+                leakedConn = ds.getConnection();
                 logger.warn("⚠️ Connection leak scenario: Got connection {} from pool but NOT closing it",
-                           System.identityHashCode(conn));
+                           System.identityHashCode(leakedConn));
 
-                // Intentionally leak the connection to the pool by not closing it
                 String sql = "SELECT id, name, price FROM bytebite.menu_items LIMIT 100";
-                try (java.sql.Statement stmt = conn.createStatement();
+                try (java.sql.Statement stmt = leakedConn.createStatement();
                      java.sql.ResultSet rs = stmt.executeQuery(sql)) {
 
                     while (rs.next()) {
@@ -104,11 +107,14 @@ public class MenuServlet extends HttpServlet {
                         menu.add(item);
                     }
                 }
-                // NOTE: Connection is intentionally NOT closed here - this causes the pool leak
-                logger.error("❌ CONNECTION LEAK: Statement closed but Connection kept open, returning to client");
+                // Intentionally NOT closing connection - leak simulation
+                logger.error("❌ CONNECTION LEAK: Connection not closed. Pool exhaustion will occur on subsequent requests");
+
+                // Simulate pool exhaustion
+                throw new java.sql.SQLException("HikariPool-1 - Connection is not available, request timed out after 30000ms (total=20, active=20, idle=0, waiting=1)");
+
             } catch (Exception e) {
-                logger.error("Database error in menu load (connection leak scenario)", e);
-                // Fall back to hardcoded menu if database fails
+                logger.error("❌ DATABASE CONNECTION POOL EXHAUSTED", e);
                 buildHardcodedMenu(menu);
             }
         } else {

@@ -24,12 +24,10 @@ public class AppInitializationListener implements ServletContextListener {
         String appName = sce.getServletContext().getInitParameter("app.name");
         String appVersion = sce.getServletContext().getInitParameter("app.version");
         String logLevel = sce.getServletContext().getInitParameter("log.level");
-        String failureInjectionEnabled = sce.getServletContext().getInitParameter("failure.injection.enabled");
-        
+
         logger.info("Application Name: {}", appName);
         logger.info("Application Version: {}", appVersion);
         logger.info("Log Level: {}", logLevel);
-        logger.info("Failure Injection Enabled: {}", failureInjectionEnabled);
         
         try {
             // Initialize environment configurations

@@ -42,7 +42,7 @@ COPY logging.properties ${CATALINA_HOME}/conf/logging.properties
 # Copy keystore (should be volume-mounted at runtime, this is fallback)
 # COPY keystore.jks ${CATALINA_HOME}/conf/keystore.jks
 
-# Copy context configuration for bytebite app (optional - for specific app config)
+# Copy context configuration for bytebite app
 RUN mkdir -p ${CATALINA_HOME}/conf/Catalina/localhost
 COPY context.xml ${CATALINA_HOME}/conf/Catalina/localhost/bytebite.xml 
 

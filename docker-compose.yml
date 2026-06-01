@@ -87,11 +87,7 @@ services:
       dockerfile: Dockerfile
     container_name: bytebite-tomcat
     environment:
-    #  JAVA_OPTS: >
-     #   -Dcom.sun.jndi.ldap.connect.pool=true
-      #  -Dcom.sun.jndi.ldap.connect.pool.maxsize=20
-       # -Dcom.sun.jndi.ldap.connect.pool.prefsize=5
-        #-Dcom.sun.jndi.ldap.connect.pool.timeout=300000
+      JAVA_OPTS: -Xmx512m -Xms256m
       DB_HOST: postgres
       DB_PORT: 5432
       DB_NAME: bytebite_db
@@ -105,7 +101,6 @@ services:
       SSL_ENABLED: "true"
       SSL_KEYSTORE_PATH: /usr/local/tomcat/conf/keystore.jks
       SSL_KEYSTORE_PASSWORD: tomcat_keystore_pwd_123
-      FAILURE_INJECTION_ENABLED: "false"
       LOG_LEVEL: INFO
     ports:
       - "8080:8080"

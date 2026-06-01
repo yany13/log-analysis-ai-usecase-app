@@ -78,7 +78,4 @@ public class Constants {
     // Pagination defaults
     public static final int DEFAULT_PAGE_SIZE = 20;
     public static final int MAX_PAGE_SIZE = 100;
-
-    // Failure injection
-    public static final String FAILURE_INJECTION_ENABLED_KEY = "failure.injection.enabled";
 }

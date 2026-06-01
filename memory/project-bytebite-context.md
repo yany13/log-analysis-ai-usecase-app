@@ -7,8 +7,19 @@ metadata:
   originSessionId: 4993df77-2ed9-4cfb-bcca-5daac1735259
 ---
 
-ByteBite is a local Java troubleshooting lab for an engineering book teaching senior engineers how to debug production failures.
+ByteBite is an interactive troubleshooting lab for an advanced Java debugging book. It's **not a production system**—it's a controlled learning environment where senior engineers trigger engineered failures and analyze logs to diagnose root causes.
 
-**Why:** The book's premise is hands-on: readers trigger real failures in a controlled environment and analyze `catalina.out` logs to diagnose them.
+**Why:** The book teaches hands-on debugging: readers pull failure toggles in the UI, observe failures in `catalina.out`, and learn to read diagnostics (thread dumps, heap stats, lock traces, SSL errors). Each failure mimics real production patterns.
 
-**How to apply:** All code must contain explicit, intentional bugs togglable via the UI. The five vectors are: DB connection leak (/menu), LDAP auth failure (/login), OOM heap exhaustion (/analytics), thread deadlock (/kds), SSL handshake failure (/checkout). Stack is immutable: Temurin JDK 21, Tomcat 11, PostgreSQL 15-alpine, OpenLDAP 1.5.0. Docker Compose on `bytebite-net`. UI is premium restaurant theme, vanilla HTML5 only.
+**How to apply:** 
+
+**5 Engineered Failure Vectors:**
+- `/menu` → DB Connection Leak: HikariCP pool exhaustion
+- `/login` → LDAP Auth Failure: Directory service timeout/unavailable
+- `/analytics` → OOM Heap Exhaustion: Unbounded event buffering
+- `/kds` → Thread Deadlock: Circular lock (order service ↔ database)
+- `/checkout` → SSL Handshake Failure: Certificate validation error
+
+**Immutable Stack:** Temurin JDK 21 (in Docker), Tomcat 11, PostgreSQL 15-alpine, OpenLDAP 1.5.0. Docker Compose on `bytebite-net`. UI is premium restaurant theme (vanilla HTML5 + CSS, no frameworks). All logs in `catalina.out` (SLF4J/Logback).
+
+**Trigger Failures:** Pass `failureType` as HTTP request parameter to trigger individual failures (e.g., `?failureType=db_leak`). No global on/off switch—failures only activate when explicitly requested.

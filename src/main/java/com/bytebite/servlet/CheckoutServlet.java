@@ -64,28 +64,30 @@ public class CheckoutServlet extends HttpServlet {
         try {
             response.setContentType("application/json");
 
+            // Parse request once
+            String body = new String(request.getInputStream().readAllBytes());
+            Map<String, Object> orderData = objectMapper.readValue(body, Map.class);
+
             // Check for SSL failure injection
-            if (FailureInjectionUtil.isFailureType(request, FailureInjectionUtil.FAILURE_SSL)) {
+            String failureType = (String) orderData.get("failureType");
+            if (FailureInjectionUtil.FAILURE_SSL.equals(failureType)) {
                 FailureInjectionUtil.logFailureActivation(FailureInjectionUtil.FAILURE_SSL);
-                logger.warn("⚠️ SSL FAILURE INJECTION: Attempting connection to self-signed HTTPS endpoint");
+                logger.warn("⚠️ SSL FAILURE INJECTION: Attempting connection to payment gateway with self-signed certificate");
                 try {
                     testSSLHandshakeFailure();
-                    // If we got here, SSL didn't fail (shouldn't happen in real scenario)
                     logger.warn("SSL test endpoint did not fail as expected");
                 } catch (SSLHandshakeException e) {
-                    logger.error("❌ SSL HANDSHAKE FAILURE SCENARIO: {}", e.getMessage(), e);
+                    logger.error("❌ SSL CERTIFICATE VALIDATION FAILED", e);
+                    logger.error("Cause: {}", e.getCause() != null ? e.getCause().toString() : "PKIX path building failed");
                     response.setStatus(HttpServletResponse.SC_BAD_GATEWAY);
                     Map<String, String> error = new HashMap<>();
                     error.put("status", "error");
-                    error.put("message", "SSL Certificate Validation Failed: " + e.getMessage());
+                    error.put("message", "SSL Certificate Validation Failed");
+                    error.put("details", "sun.security.validator.ValidatorException: PKIX path building failed");
                     response.getWriter().write(objectMapper.writeValueAsString(error));
                     return;
                 }
             }
-
-            // Parse request
-            String body = new String(request.getInputStream().readAllBytes());
-            Map<String, Object> orderData = objectMapper.readValue(body, Map.class);
 
             // Create order
             String orderNumber = "ORD-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
@@ -186,9 +188,10 @@ public class CheckoutServlet extends HttpServlet {
      * This will fail with SSLHandshakeException because the cert is not in the truststore
      */
     private void testSSLHandshakeFailure() throws IOException {
-        // Try to connect to a test HTTPS endpoint with self-signed cert
-        // This endpoint doesn't actually need to exist - the SSL handshake will fail first
-        String testUrl = "https://self-signed.example.com:8443/payment-gateway";
+        // Simulate SSL certificate validation failure
+        // Using badssl.com - a test site with various SSL/TLS issues
+        // expired.badssl.com - expired certificate (demonstrates real SSL validation error)
+        String testUrl = "https://expired.badssl.com/";
 
         logger.warn("Attempting HTTPS connection to: {}", testUrl);
 
@@ -201,16 +204,17 @@ public class CheckoutServlet extends HttpServlet {
             conn.setReadTimeout(5000);
 
             logger.info("Initiating SSL handshake with {}", url.getHost());
-            // This will trigger the SSL handshake and fail
-            conn.connect();
-
-            logger.error("Unexpected success connecting to {}", url);
+            // This will trigger the SSL handshake and fail due to expired certificate
+            int responseCode = conn.getResponseCode();
+            logger.error("Unexpected success connecting to {}, response code: {}", url, responseCode);
         } catch (SSLHandshakeException e) {
-            // Expected failure - re-throw to caller
+            // Expected failure - certificate expired or invalid
+            logger.error("SSL Handshake Exception caught: {}", e.getMessage());
             throw e;
         } catch (javax.net.ssl.SSLException e) {
             // Re-wrap as SSLHandshakeException for clarity
-            throw new SSLHandshakeException("SSL handshake failed: " + e.getMessage());
+            logger.error("SSL Exception caught: {}", e.getMessage());
+            throw new SSLHandshakeException("SSL certificate validation failed: " + e.getMessage());
         }
     }
 

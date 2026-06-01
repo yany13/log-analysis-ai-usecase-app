@@ -300,7 +300,6 @@ SSL_KEYSTORE_PASSWORD: pwd123             # Keystore password
 #### Application Configuration
 ```yaml
 LOG_LEVEL: INFO                           # Logging level (DEBUG, INFO, WARN, ERROR)
-FAILURE_INJECTION_ENABLED: "false"        # Chaos testing (disable in prod)
 JAVA_MEMORY: 1024m                        # JVM heap size
 ```
 

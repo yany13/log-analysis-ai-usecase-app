@@ -109,6 +109,40 @@ CREATE TABLE order_items (
 
 CREATE INDEX idx_order_items_order_id ON order_items(order_id);
 
+-- Menu Items Table
+CREATE TABLE menu_items (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    price DECIMAL(10, 2) NOT NULL,
+    description TEXT,
+    category VARCHAR(100),
+    available BOOLEAN DEFAULT true,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_menu_items_category ON menu_items(category);
+CREATE INDEX idx_menu_items_available ON menu_items(available);
+
+-- Seed menu items for ByteBite restaurant
+INSERT INTO bytebite.menu_items (name, price, description, category, available) VALUES
+('Margherita Pizza', 12.99, 'Classic Italian pizza with tomato, mozzarella, basil', 'Pizza', true),
+('Pepperoni Pizza', 13.99, 'Pizza with pepperoni and cheese', 'Pizza', true),
+('BBQ Chicken Pizza', 14.99, 'Grilled chicken with BBQ sauce and cheddar', 'Pizza', true),
+('Classic Burger', 10.99, 'Beef patty with lettuce, tomato, onion', 'Burgers', true),
+('Deluxe Burger', 12.99, 'Double beef with cheese, bacon, special sauce', 'Burgers', true),
+('Veggie Burger', 9.99, 'Plant-based patty with fresh vegetables', 'Burgers', true),
+('Carbonara Pasta', 11.99, 'Creamy pasta with guanciale, pecorino, egg', 'Pasta', true),
+('Marinara Pasta', 10.99, 'Pasta in fresh tomato and garlic sauce', 'Pasta', true),
+('Bolognese Pasta', 12.99, 'Rich meat sauce with pasta', 'Pasta', true),
+('Caesar Salad', 8.99, 'Romaine, parmesan, croutons, Caesar dressing', 'Salads', true),
+('Greek Salad', 9.99, 'Fresh vegetables with feta cheese', 'Salads', true),
+('Chocolate Cake', 5.99, 'Rich chocolate cake with ganache', 'Desserts', true),
+('Tiramisu', 5.99, 'Classic Italian dessert', 'Desserts', true),
+('Gelato', 4.99, 'Premium Italian ice cream', 'Desserts', true),
+('Coca Cola', 2.99, 'Cold soft drink', 'Beverages', true),
+('Iced Tea', 2.99, 'Refreshing iced tea', 'Beverages', true);
+
 -- Analytics Events Table
 CREATE TABLE analytics_events (
     event_id BIGSERIAL PRIMARY KEY,
@@ -172,9 +206,26 @@ INSERT INTO users (username, email, is_active, is_admin) VALUES
 ('admin', 'admin@bytebite.local', true, true);
 
 -- Assign admin role to admin user
-INSERT INTO user_role_mapping (user_id, role_id) 
-SELECT u.user_id, r.role_id FROM users u, user_roles r 
+INSERT INTO user_role_mapping (user_id, role_id)
+SELECT u.user_id, r.role_id FROM users u, user_roles r
 WHERE u.username = 'admin' AND r.role_name = 'ADMIN';
+
+-- Seed analytics_events with test data for OOM failure injection testing
+-- ~10,000 events to trigger OOM when loaded into memory with 100KB payload per event
+INSERT INTO bytebite.analytics_events (event_type, event_data, user_id, created_at)
+SELECT
+  CASE WHEN (row_number() OVER ()) % 3 = 0 THEN 'PAGE_VIEW'
+       WHEN (row_number() OVER ()) % 3 = 1 THEN 'PURCHASE'
+       ELSE 'CHECKOUT' END,
+  jsonb_build_object(
+    'action', CASE WHEN (row_number() OVER ()) % 2 = 0 THEN 'click' ELSE 'navigate' END,
+    'value', random() * 1000,
+    'timestamp', (NOW() - INTERVAL '1 day' * random())::text,
+    'details', 'Test analytics event for OOM failure injection scenario'
+  ),
+  1,
+  NOW() - INTERVAL '1 day' * random()
+FROM generate_series(1, 10000);
 
 -- Grant permissions
 GRANT USAGE ON SCHEMA bytebite TO bytebite;

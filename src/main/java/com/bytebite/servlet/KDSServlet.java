@@ -50,12 +50,20 @@ public class KDSServlet extends HttpServlet {
 
                 String orderId = (String) update.get("orderId");
                 String status = (String) update.get("status");
+                String failureType = (String) update.get("failureType");
 
                 // Check for deadlock injection
-                if (FailureInjectionUtil.isFailureType(request, FailureInjectionUtil.FAILURE_DEADLOCK)) {
+                if (FailureInjectionUtil.FAILURE_DEADLOCK.equals(failureType)) {
                     FailureInjectionUtil.logFailureActivation(FailureInjectionUtil.FAILURE_DEADLOCK);
-                    logger.warn("⚠️ DEADLOCK FAILURE INJECTION: Creating deadlock scenario");
-                    updateOrderStatusWithDeadlock(orderId, status);
+                    logger.warn("⚠️ DEADLOCK FAILURE INJECTION: Creating deadlock scenario with inverted lock ordering");
+                    try {
+                        updateOrderStatusWithDeadlock(orderId, status);
+                    } catch (Exception e) {
+                        logger.error("❌ DEADLOCK SCENARIO DETECTED", e);
+                        response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+                        response.getWriter().write("{\"status\": \"error\", \"message\": \"" + e.getMessage() + "\"}");
+                        return;
+                    }
                 } else {
                     updateOrderStatus(orderId, status);
                 }
@@ -138,7 +146,7 @@ public class KDSServlet extends HttpServlet {
      * Thread 2: locks inventoryLock, then tries to lock orderLock
      * Result: Both threads block indefinitely
      */
-    private void updateOrderStatusWithDeadlock(String orderId, String status) {
+    private void updateOrderStatusWithDeadlock(String orderId, String status) throws Exception {
         logger.warn("⚠️ Creating deadlock with order {} and status {}", orderId, status);
 
         // Thread 1: Lock orders first, then inventory
@@ -147,7 +155,7 @@ public class KDSServlet extends HttpServlet {
                 logger.info("Thread-1: Attempting to acquire orderLock");
                 synchronized (orderLock) {
                     logger.warn("Thread-1: Acquired orderLock");
-                    Thread.sleep(100); // Give thread2 time to acquire inventoryLock
+                    Thread.sleep(100);
 
                     logger.info("Thread-1: Attempting to acquire inventoryLock");
                     synchronized (inventoryLock) {
@@ -166,7 +174,7 @@ public class KDSServlet extends HttpServlet {
                 logger.info("Thread-2: Attempting to acquire inventoryLock");
                 synchronized (inventoryLock) {
                     logger.warn("Thread-2: Acquired inventoryLock");
-                    Thread.sleep(100); // Give thread1 time to acquire orderLock
+                    Thread.sleep(100);
 
                     logger.info("Thread-2: Attempting to acquire orderLock");
                     synchronized (orderLock) {
@@ -185,13 +193,26 @@ public class KDSServlet extends HttpServlet {
         thread1.start();
         thread2.start();
 
-        // Wait briefly for deadlock to establish
+        // Wait for deadlock to establish
         try {
             Thread.sleep(500);
             if (thread1.isAlive() && thread2.isAlive()) {
-                logger.error("❌ DEADLOCK SCENARIO: Both threads are now BLOCKED");
-                logger.error("Thread-1 state: {} (waiting for inventoryLock)", thread1.getState());
-                logger.error("Thread-2 state: {} (waiting for orderLock)", thread2.getState());
+                Thread.State state1 = thread1.getState();
+                Thread.State state2 = thread2.getState();
+                logger.error("❌ DEADLOCK DETECTED: Both threads blocked with inverted lock ordering");
+                logger.error("Thread-1 (OrderUpdateWorker-1) state: {} waiting for inventoryLock", state1);
+                logger.error("Thread-2 (InventoryUpdateWorker-2) state: {} waiting for orderLock", state2);
+
+                Exception deadlockEx = new Exception(
+                    "Deadlock detected: Thread-1 blocked on inventoryLock, Thread-2 blocked on orderLock");
+                StackTraceElement[] trace = new StackTraceElement[]{
+                    new StackTraceElement("com.bytebite.servlet.KDSServlet", "updateOrderStatusWithDeadlock",
+                                         "KDSServlet.java", 150),
+                    new StackTraceElement("com.bytebite.servlet.KDSServlet$1", "run",
+                                         "KDSServlet.java", 145)
+                };
+                deadlockEx.setStackTrace(trace);
+                throw deadlockEx;
             }
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
