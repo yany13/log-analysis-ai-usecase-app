@@ -29,7 +29,7 @@ cn: Admin User
 sn: Administrator
 givenName: Admin
 mail: admin@bytebite.local
-userPassword: admin
+userPassword: {SSHA}DprXCbxIDyHENKZIaBaPmiOJGkPydEgu
 ou: Administrators
 description: ByteBite System Administrator
 
@@ -46,7 +46,7 @@ cn: Manager User
 sn: Manager
 givenName: Manager
 mail: manager@bytebite.local
-userPassword: admin
+userPassword: {SSHA}DprXCbxIDyHENKZIaBaPmiOJGkPydEgu
 ou: Management
 description: ByteBite Operations Manager
 
@@ -63,7 +63,7 @@ cn: Staff User One
 sn: Staff
 givenName: User One
 mail: staff1@bytebite.local
-userPassword: admin
+userPassword: {SSHA}DprXCbxIDyHENKZIaBaPmiOJGkPydEgu
 ou: Staff
 description: ByteBite Staff Member
 
@@ -80,7 +80,7 @@ cn: Staff User Two
 sn: Staff
 givenName: User Two
 mail: staff2@bytebite.local
-userPassword: admin
+userPassword: {SSHA}DprXCbxIDyHENKZIaBaPmiOJGkPydEgu
 ou: Staff
 description: ByteBite Staff Member
 
@@ -97,7 +97,7 @@ cn: KDS Operator
 sn: Operator
 givenName: KDS
 mail: kds@bytebite.local
-userPassword: admin
+userPassword: {SSHA}DprXCbxIDyHENKZIaBaPmiOJGkPydEgu
 ou: KDS
 description: Kitchen Display System Operator
 
@@ -114,7 +114,7 @@ cn: Customer User
 sn: Customer
 givenName: John
 mail: customer1@bytebite.local
-userPassword: admin
+userPassword: {SSHA}DprXCbxIDyHENKZIaBaPmiOJGkPydEgu
 ou: Customers
 description: ByteBite Customer
 
