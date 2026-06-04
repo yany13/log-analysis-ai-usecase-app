@@ -7,7 +7,8 @@
 SNIFFER_LOG_DIR="${SNIFFER_LOG_DIR:-/logs}"
 FILTER_FILE="${SNIFFER_FILTER_FILE:-/etc/sniffer/capture_filter.conf}"
 LOG_FILE="$SNIFFER_LOG_DIR/network_sniff.log"
-INTERFACE="${SNIFFER_INTERFACE:-any}"
+# Use loopback for Docker Desktop (works), eth0 for Linux native
+INTERFACE="${SNIFFER_INTERFACE:-lo}"
 
 # Ensure log directory exists
 mkdir -p "$SNIFFER_LOG_DIR"
