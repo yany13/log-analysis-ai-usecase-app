@@ -20,6 +20,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     netcat-openbsd \
     tcpdump \
     postgresql-client \
+    ldap-utils \
     && rm -rf /var/lib/apt/lists/*
 
 # Create keystore directory
@@ -38,30 +39,33 @@ RUN mkdir -p ${CATALINA_HOME}/logs \
     && mkdir -p ${CATALINA_HOME}/temp
 
 # Copy server configuration
-COPY server.xml ${CATALINA_HOME}/conf/server.xml
+COPY docker/tomcat/server.xml ${CATALINA_HOME}/conf/server.xml
 
 # Copy logging configuration for ByteBite application logging
-COPY logging.properties ${CATALINA_HOME}/conf/logging.properties
+COPY docker/tomcat/logging.properties ${CATALINA_HOME}/conf/logging.properties
 
 # Copy keystore (should be volume-mounted at runtime, this is fallback)
-# COPY keystore.jks ${CATALINA_HOME}/conf/keystore.jks
+# COPY docker/tomcat/keystore.jks ${CATALINA_HOME}/conf/keystore.jks
 
 # Copy context configuration for bytebite app
 RUN mkdir -p ${CATALINA_HOME}/conf/Catalina/localhost
-COPY context.xml ${CATALINA_HOME}/conf/Catalina/localhost/bytebite.xml 
+COPY docker/tomcat/context.xml ${CATALINA_HOME}/conf/Catalina/localhost/bytebite.xml
+
+# Copy initialization files (from adhoc container consolidation)
+RUN mkdir -p /ldif ${CATALINA_HOME}/docker-init
+COPY docker/adhoc/bootstrap.ldif /ldif/bootstrap.ldif
+COPY docker/postgres/init.sql ${CATALINA_HOME}/docker-init/init.sql
+
+# Copy entrypoint script
+COPY docker/tomcat/entrypoint.sh /usr/local/bin/entrypoint.sh
 
 # Set correct permissions
 RUN chmod -R 755 ${CATALINA_HOME}/logs \
     && chmod -R 755 ${CATALINA_HOME}/temp \
     && chmod -R 755 ${CATALINA_HOME}/work \
-    && chmod 644 ${CATALINA_HOME}/conf/server.xml
-
-# Copy startup script
-# COPY startup.sh ${CATALINA_HOME}/bin/startup.sh
-# RUN chmod +x ${CATALINA_HOME}/bin/startup.sh \
-#    && chmod +x ${CATALINA_HOME}/bin/catalina.sh
-
-RUN chmod +x ${CATALINA_HOME}/bin/catalina.sh
+    && chmod 644 ${CATALINA_HOME}/conf/server.xml \
+    && chmod +x /usr/local/bin/entrypoint.sh \
+    && chmod +x ${CATALINA_HOME}/bin/catalina.sh
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
@@ -73,5 +77,5 @@ EXPOSE 8080 8443 8009
 # Set working directory
 WORKDIR ${CATALINA_HOME}
 
-# Run Tomcat
-CMD ["catalina.sh", "run"]
+# Use entrypoint script for initialization + Tomcat startup
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]

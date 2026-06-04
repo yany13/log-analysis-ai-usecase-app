@@ -58,37 +58,11 @@ services:
       retries: 5
     restart: unless-stopped
 
-  # Adhoc Initialization Container - Runs all automation tasks
-  adhoc:
-    build:
-      context: .
-      dockerfile: ./docker/adhoc/Dockerfile
-    container_name: bytebite-adhoc
-    environment:
-      LDAP_HOST: openldap
-      LDAP_PORT: 389
-      LDAP_ADMIN_DN: cn=admin,dc=bytebite,dc=local
-      LDAP_ADMIN_PASSWORD: admin_secure_pwd_123
-      LDAP_BASE_DN: dc=bytebite,dc=local
-      DB_HOST: postgres
-      DB_PORT: 5432
-      DB_NAME: bytebite_db
-      DB_USER: bytebite
-      DB_PASSWORD: bytebite_secure_pwd_123
-    depends_on:
-      openldap:
-        condition: service_healthy
-      postgres:
-        condition: service_healthy
-    networks:
-      - bytebite-network
-    restart: "no"
-
-  # Apache Tomcat Application Server
+# Apache Tomcat Application Server
   tomcat:
     build:
-      context: ./docker/tomcat
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: ./docker/tomcat/Dockerfile
     container_name: bytebite-tomcat
     environment:
       JAVA_OPTS: -Xmx512m -Xms256m
@@ -120,8 +94,6 @@ services:
         condition: service_healthy
       openldap:
         condition: service_healthy
-      adhoc:
-        condition: service_started
     networks:
       - bytebite-network
     healthcheck:
