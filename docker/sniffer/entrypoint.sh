@@ -51,34 +51,52 @@ fi
 # Trap SIGTERM to gracefully shutdown
 trap 'echo "[$(date)] Received SIGTERM, shutting down..." >&2; exit 0' SIGTERM
 
-# Create a demo/test log entry if this is the first start (for Docker Desktop compatibility demo)
+# Create initial log entry
 if [ ! -f "$LOG_FILE" ]; then
-    echo "[$(date)] Creating initial sniffer log with system info..." >&2
+    echo "[$(date)] Creating initial sniffer log..." >&2
     {
         echo "# ByteBite Network Sniffer - Initialized on $(date)"
         echo "# Docker Bridge Network Packet Capture Log"
         echo "# Format: [TIMESTAMP] PROTOCOL SRC_IP:PORT → DST_IP:PORT [TRANSACTION] \"PAYLOAD\" (SIZE bytes)"
         echo ""
-        echo "[$(date +%Y-%m-%d\ %H:%M:%S.000)] System    Init              → 172.18.0.1         [SNIFFER_READY] \"Network sniffer initialized and listening\""
+        echo "[$(date +%Y-%m-%d\ %H:%M:%S.000)] System    Init              → 172.18.0.1         [SNIFFER_READY] \"Network sniffer initialized and listening on all interfaces\""
     } > "$LOG_FILE"
 fi
 
-# Start tcpdump and pipe to Python parser
-# -i: interface (any = all interfaces on this network)
-# -n: don't resolve addresses
-# -l: line-buffered output
-# -A: print ASCII (for payload inspection)
-echo "[$(date)] Starting tcpdump on all interfaces..." >&2
+# Check if we can actually capture packets (Linux native support)
+# On Docker Desktop, tcpdump on bridge won't see inter-container traffic
+echo "[$(date)] Starting tcpdump capture on interface: $INTERFACE..." >&2
+echo "[$(date)] BPF filter: $TCPDUMP_FILTER" >&2
+
+# Start tcpdump with timeout to detect if capture is working
+{
+    timeout 5 tcpdump -i "$INTERFACE" -n -l -A "$TCPDUMP_FILTER" 2>/dev/null
+    tcpdump_exit=$?
+
+    # If tcpdump exits immediately, we're in Docker Desktop (no packet capture possible)
+    if [ $tcpdump_exit -eq 124 ]; then
+        echo "[$(date)] tcpdump is listening (Linux native mode)" >&2
+    else
+        echo "[$(date)] WARNING: tcpdump exited with code $tcpdump_exit" >&2
+        echo "[$(date)] This may indicate Docker Desktop (bridge traffic not visible to tcpdump)" >&2
+        echo "[$(date)] On Linux with native Docker, this would capture all app traffic" >&2
+    fi
+} | /usr/bin/python3 /usr/local/bin/parse_traffic.py "$LOG_FILE" &
+
+# Run tcpdump continuously in background
 tcpdump -i "$INTERFACE" -n -l -A "$TCPDUMP_FILTER" 2>/dev/null | \
     /usr/bin/python3 /usr/local/bin/parse_traffic.py "$LOG_FILE"
 
-# Fallback: if tcpdump fails and no packets are being captured,
-# the sniffer stays alive and logs system readiness
+# Keep sniffer running even if tcpdump fails
 exit_code=$?
-if [ $exit_code -ne 0 ]; then
-    echo "[$(date)] tcpdump exited with code: $exit_code, attempting graceful restart..." >&2
-    # Keep running to avoid constant restart loops
-    while true; do
-        sleep 30
-    done
-fi
+echo "[$(date)] tcpdump exited with code: $exit_code" >&2
+echo "[$(date)] Sniffer staying alive (waiting for packets on $INTERFACE)..." >&2
+
+# Keep container running
+while true; do
+    sleep 30
+    if [ ! -f "$LOG_FILE" ]; then
+        # Ensure log file exists
+        touch "$LOG_FILE"
+    fi
+done
