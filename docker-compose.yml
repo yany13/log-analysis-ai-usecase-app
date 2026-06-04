@@ -128,6 +128,31 @@ services:
       start_period: 30s
     restart: unless-stopped
 
+  # Network Sniffer Service - Captures and analyzes network traffic
+  sniffer:
+    build:
+      context: ./docker/sniffer
+      dockerfile: Dockerfile
+    container_name: bytebite-sniffer
+    networks:
+      - bytebite-network
+    cap_add:
+      - NET_ADMIN
+    volumes:
+      - sniffer_logs:/logs
+      - ./docker/sniffer/capture_filter.conf:/etc/sniffer/capture_filter.conf
+    restart: always
+    depends_on:
+      postgres:
+        condition: service_healthy
+      openldap:
+        condition: service_healthy
+      tomcat:
+        condition: service_healthy
+    environment:
+      SNIFFER_LOG_DIR: /logs
+      SNIFFER_FILTER_FILE: /etc/sniffer/capture_filter.conf
+
 networks:
   bytebite-network:
     driver: bridge
@@ -140,4 +165,6 @@ volumes:
   openldap_config:
     driver: local
   tomcat_logs:
+    driver: local
+  sniffer_logs:
     driver: local
