@@ -1,12 +1,14 @@
 FROM alpine:3.19
 
-# Install tcpdump, python3, and utilities
+# Install tcpdump, python3, and networking utilities
 RUN apk add --no-cache \
     tcpdump \
     python3 \
     curl \
     iproute2 \
-    grep
+    grep \
+    netcat-openbsd \
+    net-tools
 
 # Create log directory
 RUN mkdir -p /logs

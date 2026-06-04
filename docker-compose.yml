@@ -3,7 +3,9 @@ version: '3.8'
 services:
   # PostgreSQL Database
   postgres:
-    image: postgres:15-alpine
+    build:
+      context: ./docker/postgres
+      dockerfile: Dockerfile
     container_name: bytebite-postgres
     environment:
       POSTGRES_DB: bytebite_db
@@ -25,7 +27,9 @@ services:
 
   # OpenLDAP Authentication Server
   openldap:
-    image: osixia/openldap:1.5.0
+    build:
+      context: ./docker/openldap
+      dockerfile: Dockerfile
     container_name: bytebite-openldap
     environment:
       LDAP_LOG_LEVEL: 256

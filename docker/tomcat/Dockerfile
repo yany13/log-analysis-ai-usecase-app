@@ -10,12 +10,16 @@ ENV CATALINA_HOME=/usr/local/tomcat \
     CATALINA_OPTS="-Djava.awt.headless=true -XX:+UseG1GC -XX:MaxGCPauseMillis=200" \
     JAVA_TOOL_OPTIONS="-Dfile.encoding=UTF-8"
 
-# Install additional dependencies
+# Install additional dependencies and networking utilities
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     wget \
     openssl \
     ca-certificates \
+    net-tools \
+    netcat-openbsd \
+    tcpdump \
+    postgresql-client \
     && rm -rf /var/lib/apt/lists/*
 
 # Create keystore directory
