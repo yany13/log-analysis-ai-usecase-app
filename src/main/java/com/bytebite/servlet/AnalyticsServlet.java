@@ -48,7 +48,28 @@ public class AnalyticsServlet extends HttpServlet {
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
-        request.getRequestDispatcher("/analytics.html").forward(request, response);
+        String path = request.getServletPath();
+
+        if (path.contains("api")) {
+            handleAPIRequest(request, response);
+        } else {
+            request.getRequestDispatcher("/analytics.html").forward(request, response);
+        }
+    }
+
+    private void handleAPIRequest(HttpServletRequest request, HttpServletResponse response)
+            throws ServletException, IOException {
+        response.setContentType("application/json");
+
+        String action = request.getParameter("action");
+
+        if ("stats".equals(action)) {
+            Map<String, Object> stats = new HashMap<>();
+            stats.put("totalEvents", 0);
+            response.getWriter().write(objectMapper.writeValueAsString(stats));
+        } else {
+            response.getWriter().write("{}");
+        }
     }
 
     @Override

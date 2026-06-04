@@ -35,7 +35,13 @@ public class MenuServlet extends HttpServlet {
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
-        request.getRequestDispatcher("/menu.html").forward(request, response);
+        String path = request.getServletPath();
+
+        if (path.contains("api")) {
+            handleAPIRequestGET(request, response);
+        } else {
+            request.getRequestDispatcher("/menu.html").forward(request, response);
+        }
     }
 
     @Override
@@ -51,6 +57,15 @@ public class MenuServlet extends HttpServlet {
             response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
             response.getWriter().write("{\"error\": \"JSON body required\"}");
         }
+    }
+
+    private void handleAPIRequestGET(HttpServletRequest request, HttpServletResponse response)
+            throws ServletException, IOException {
+        response.setContentType("application/json");
+
+        String failureType = request.getParameter("failureType");
+        List<Map<String, Object>> menu = getMenu(failureType);
+        response.getWriter().write(objectMapper.writeValueAsString(menu));
     }
 
     private void handleAPIRequest(Map<String, Object> payload, HttpServletResponse response)
