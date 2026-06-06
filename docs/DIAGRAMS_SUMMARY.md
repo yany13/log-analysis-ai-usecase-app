@@ -1,12 +1,19 @@
-# ByteBite Book Diagrams — Visual Reference Guide (Updated)
+# ByteBite Book Diagrams — Visual Reference Guide (Version 3.0)
 
 ## Overview
 
-Four professional, publication-ready architecture diagrams have been created for the ByteBite troubleshooting guide. These diagrams illustrate:
+**9 professional, publication-ready architecture diagrams** have been created for the ByteBite troubleshooting guide:
+
+### 📊 Original Overview Diagrams (1-4)
 - **Infrastructure topology** (user to database flow)
 - **Application request flows** (login, menu, analytics, checkout, KDS)
 - **Database schema architecture** (11 tables and relationships)
-- **Servlet-to-database connection patterns** (HikariCP, failure injection points)
+- **Servlet-to-database connection patterns** (HikariCP, all 5 failure injection points side-by-side)
+
+### 📘 New: Individual Use-Case Diagrams (5A-5E)
+- **One diagram per failure type**, optimized for A4 print and book chapters
+- **Detailed execution flows** with numbered steps and diagnostic signals
+- Each diagram shows: trigger, execution path, failure point, log signatures, troubleshooting tips
 
 All diagrams are **code-free**, **SVG-based** for scalability, and suitable for book publication. They show failure patterns and diagnostic signatures readers will encounter in logs.
 
@@ -91,41 +98,16 @@ All diagrams are **code-free**, **SVG-based** for scalability, and suitable for 
 
 ---
 
-### 4. **Servlet & Database Connection Architecture** (`04-servlet-architecture.svg`)
+### 4. **Servlet & Database Connection Architecture (Overview)** (`04-servlet-architecture.svg`)
 **File**: `docs/04-servlet-architecture.svg`
 
 **Shows**:
-- **5 detailed flow diagrams** showing servlet → service → DAO → HikariCP → SQL:
-
-  1. **LOGIN FLOW** (with LDAP_TIMEOUT injection at line 141)
-     - UserService → LDAP bind attempt
-     - UserDAO → PreparedStatement SELECT users
-     - HikariCP connection pool lifecycle
-  
-  2. **MENU FLOW** (with DB_LEAK injection at line 79)
-     - MenuService → MenuDAO
-     - Connection leak scenario: missing `conn.close()`
-     - Pool exhaustion progression after N requests
-  
-  3. **ANALYTICS FLOW** (with OOM injection at line 96)
-     - AnalyticsService → AnalyticsDAO
-     - Loading all 10K events into memory (100KB each = 1GB heap)
-     - OutOfMemoryError with Xmx=512m
-  
-  4. **CHECKOUT FLOW** (with DEADLOCK & SSL injection at lines 68+)
-     - CheckoutServlet → OrderService → OrderDAO
-     - Transaction with 3 inserts (orders, order_items, kds_orders)
-     - Lock ordering: orders 1st → inventory 2nd (normal path)
-  
-  5. **KDS FLOW** (with DEADLOCK injection at line 55)
-     - KDSServlet → KDSService → KDSOrderDAO
-     - Reverse lock ordering: inventory 1st → orders 2nd (deadlock path)
-     - Circular wait deadlock visualization
-
+- **All 5 flows together** showing servlet → service → DAO → HikariCP → SQL
 - **HikariCP pool state**: idle, active, waiting, exhausted
 - **PreparedStatement execution**: SQL injection prevention
 - **Connection lifecycle**: getConnection() → execute → close() → back to pool
 - **Failure Summary Table**: All 5 failure types with triggers, root causes, log signals
+- Side-by-side view of all flows for reference and comparison
 
 **Key Talking Points**:
 - PreparedStatements: All SQL uses parameterized queries (SQL injection protection)
@@ -133,7 +115,132 @@ All diagrams are **code-free**, **SVG-based** for scalability, and suitable for 
 - Failure injection points: Marked at specific code locations where failures activate
 - Thread safety: HikariCP is thread-safe; deadlock occurs at DB level
 
-**Use in Book**: Chapters 4-8 - Troubleshooting each failure type & connection pooling deep dives
+**Use in Book**: Chapter 1 - Introduction to the Architecture (high-level reference showing all 5 flows at once)
+
+---
+
+## 📘 Use Case Focused Diagrams (Individual Deep Dives)
+
+Each failure type has a dedicated **A4-optimized diagram** for detailed troubleshooting chapters. These are expanded versions of flows from Diagram 4, with:
+- **Larger, clearer typography** for print publication
+- **Detailed execution steps** (numbered ①-⑦ or more)
+- **Diagnostic signal boxes** showing exact log patterns to look for
+- **Pool/memory/lock state visualizations** specific to each failure
+- **Best practices for diagnosis** at the bottom of each diagram
+
+### 5A. **Use Case 1: LDAP Timeout Failure** (`05-servlet-architecture-01-login-ldap-timeout.svg`)
+**File**: `docs/05-servlet-architecture-01-login-ldap-timeout.svg`
+
+**Shows**:
+- **Flow**: HTTP Request → Filter Chain → LoginServlet → UserService → LDAP Timeout
+- **Failure Point**: Line 88 in LoginServlet.java where `failureType == "ldap_timeout"`
+- **Trigger**: `POST /login?failureType=ldap_timeout` with credentials
+- **What Fails**: `SocketTimeoutException` during LDAP bind operation
+- **Log Signals**: 
+  - `"⚠️ LDAP Failure Injection: Simulating connection timeout"`
+  - `"SocketTimeoutException"` or `"java.net.ConnectException"` in stack trace
+- **Diagnostic Tips**: Check LDAP server health, network connectivity to port 389
+
+**Use in Book**: Chapter 4 - External Service Timeout Failures (LDAP Authentication)
+
+---
+
+### 5B. **Use Case 2: Database Connection Leak** (`05-servlet-architecture-02-menu-db-leak.svg`)
+**File**: `docs/05-servlet-architecture-02-menu-db-leak.svg`
+
+**Shows**:
+- **Flow**: HTTP Request → MenuServlet → MenuService → MenuDAO (HikariCP pool)
+- **Failure Point**: Line 79 in MenuServlet.java where `failureType == "db_leak"`
+- **Trigger**: `GET /api/menu?failureType=db_leak`
+- **What Fails**: Connection is retrieved but never returned to pool (`conn.close()` skipped)
+- **HikariCP Timeline**: 
+  - Requests 1-20: Slow (connections not returned)
+  - Request 21+: Immediate timeout (pool exhausted, max=20)
+- **Log Signals**:
+  - `"Cannot get a connection, pool error..."`
+  - `"⚠️ Connection leak scenario: connection not closed"`
+  - HikariCP shows 20 active connections, 0 idle
+- **Diagnostic Tips**: Monitor HikariCP metrics, count active connections, check for missing `close()` calls
+
+**Use in Book**: Chapter 5 - Resource Leaks & Connection Pool Exhaustion
+
+---
+
+### 5C. **Use Case 3: Out-of-Memory (OOM) Heap Exhaustion** (`05-servlet-architecture-03-analytics-oom.svg`)
+**File**: `docs/05-servlet-architecture-03-analytics-oom.svg`
+
+**Shows**:
+- **Flow**: HTTP Request → AnalyticsServlet → AnalyticsService → AnalyticsDAO (all-time query)
+- **Failure Point**: Line 96 in AnalyticsServlet.java where `failureType == "oom"`
+- **Trigger**: `GET /api/analytics?action=all-time-report&failureType=oom`
+- **What Fails**: Unbounded SELECT query returns 10K events (100-150 bytes each = 1-1.5MB) into memory
+- **Heap Timeline**:
+  - Idle: 100MB
+  - 1K events: 200MB
+  - 5K events: 350MB
+  - 10K events: **512MB (MAX)** → OutOfMemoryError
+- **Log Signals**:
+  - `"⚠️ OOM FAILURE INJECTION: Loading 10K events"`
+  - `"java.lang.OutOfMemoryError: Java heap space"`
+  - GC logs: `"[Full GC... freed NMB, X% memory]"` (multiple rapid cycles)
+- **Diagnostic Tips**: Monitor heap usage spikes, add pagination/cursor limits to queries, use jstack for thread dumps
+
+**Use in Book**: Chapter 6 - Unbounded Query & Heap Management
+
+---
+
+### 5D. **Use Case 4: Database Deadlock** (`05-servlet-architecture-04-kds-deadlock.svg`)
+**File**: `docs/05-servlet-architecture-04-kds-deadlock.svg`
+
+**Shows**:
+- **Concurrent Flows**:
+  - **Transaction 1** (KDS): Locks kds_orders → waits for orders lock
+  - **Transaction 2** (Checkout): Locks orders → waits for kds_orders lock
+- **Failure Point**: Lines 55 (KDSServlet) and 68 (CheckoutServlet) where `failureType == "deadlock"`
+- **Trigger**: Concurrent POST requests to `/api/kds` and `/checkout` with `failureType: deadlock`
+- **What Fails**: Circular lock dependency → PostgreSQL detects deadlock → **ROLLBACK one transaction**
+- **Lock Dependency Graph**: Shows circular wait (Transaction 1 → Transaction 2 → Transaction 1)
+- **Log Signals**:
+  - `"❌ DEADLOCK SCENARIO: Both threads are now BLOCKED"`
+  - `"org.postgresql.util.PSQLException: ERROR: deadlock detected"`
+  - PostgreSQL logs: `"ERROR: deadlock detected"` with DETAIL section
+- **Diagnostic Tips**: Review lock ordering in transaction code, use thread dumps to identify blocked threads, check PostgreSQL deadlock logs
+
+**Use in Book**: Chapter 7 - Concurrent Transaction & Deadlock Detection
+
+---
+
+### 5E. **Use Case 5: SSL Certificate Validation Failure** (`05-servlet-architecture-05-checkout-ssl.svg`)
+**File**: `docs/05-servlet-architecture-05-checkout-ssl.svg`
+
+**Shows**:
+- **Flow**: HTTP Request → CheckoutServlet → OrderService → OrderDAO (multi-table transaction) → SSL validation
+- **Failure Point**: Line 68 in CheckoutServlet.java where `failureType == "ssl"`
+- **Trigger**: `POST /checkout` with JSON payload + `failureType: ssl`
+- **What Fails**: SSL certificate validation fails (self-signed cert) after partial inserts (orders, order_items)
+- **Transaction Timeline**:
+  - T=0ms: BEGIN TRANSACTION
+  - T=100ms: INSERT into orders, order_items ✓
+  - T=150ms: SSL validation fails → SSLHandshakeException
+  - T=160ms: ROLLBACK COMPLETE (all rows deleted)
+- **Log Signals**:
+  - `"❌ SSL Certificate Validation Failed"`
+  - `"javax.net.ssl.SSLHandshakeException: ... PKIX validation failed"`
+  - `"ROLLBACK [orderId=ORD-XXX]"` (no rows persisted)
+- **Diagnostic Tips**: Check TLS/SSL certificates, validate certificate chain, monitor for partial transaction failures in audit logs
+
+**Use in Book**: Chapter 8 - External System Dependencies & Transaction Rollback
+
+---
+
+## 🎯 Which Diagram to Use?
+
+| Learning Goal | Use This Diagram |
+|---|---|
+| **Intro to architecture** (high-level overview) | **Diagram 4** (`04-servlet-architecture.svg`) — shows all 5 flows side-by-side |
+| **Deep dive into ONE failure type** (for each chapter) | **Diagram 5A-5E** (`05-servlet-architecture-0X-*.svg`) — individual, detailed, A4-optimized |
+| **Show non-engineers** | Diagrams 1, 2, 3 (less technical) |
+| **Troubleshooting guide** | Diagrams 4, 5A-5E (with log signals) |
 
 ---
 
@@ -171,37 +278,52 @@ Each diagram clearly marks where failure injection occurs:
 - Explain transactional vs. analytical tables
 - Highlight foreign key constraints and composite keys
 
-### Chapters 4-8: Failure Troubleshooting (One per Failure Type)
+### Chapter 1: System Architecture (Introduction)
+- **Reference**: Diagram 4 (Servlet Architecture Overview)
+- Show all 5 flows side-by-side for readers to understand the big picture
+- Introduce the concept of failure injection
+- Explain how to trigger each failure type
+
+### Chapters 4-8: Failure Troubleshooting (One per Failure Type with Individual Diagrams)
 
 #### Chapter 4: LDAP Authentication Timeout
-- **Reference**: Diagram 4 (Servlet Architecture - LOGIN FLOW)
-- Show LoginServlet → UserService → LDAP bind
-- Explain "LDAP timeout" log signature
-- Guide readers to check LDAP server health in logs
+- **Reference**: **Diagram 5A** (Use Case 1: LDAP Timeout - `05-servlet-architecture-01-login-ldap-timeout.svg`)
+- Expanded detail: Shows 6-step flow from HTTP request through LDAP timeout
+- Show LoginServlet → UserService → LDAP bind with failure point highlighted
+- Diagnostic signals: Exact log patterns readers will see in catalina.log
+- Troubleshooting checklist: How to verify LDAP server health
 
 #### Chapter 5: Database Connection Pool Exhaustion
-- **Reference**: Diagram 4 (Servlet Architecture - MENU FLOW)
-- Show HikariCP lifecycle and pool states
-- Explain connection leak (missing `close()`)
-- Show pool exhaustion progression from 5 idle → exhausted
+- **Reference**: **Diagram 5B** (Use Case 2: DB Leak - `05-servlet-architecture-02-menu-db-leak.svg`)
+- Expanded detail: Shows HikariCP pool lifecycle and exhaustion timeline
+- Show connection leak scenario (missing `close()` call)
+- HikariCP timeline: From request 1-20 (slow) to request 21+ (immediate timeout)
+- Diagnostic signals: "Cannot get a connection, pool error..."
+- Monitoring tips: Count active connections, validate `close()` calls
 
 #### Chapter 6: Out-Of-Memory Errors
-- **Reference**: Diagram 4 (Servlet Architecture - ANALYTICS FLOW)
-- Show unbounded query loading 10K events × 100KB each
-- Explain heap exhaustion with Xmx=512m
-- Link to log signatures in catalina.log
+- **Reference**: **Diagram 5C** (Use Case 3: OOM - `05-servlet-architecture-03-analytics-oom.svg`)
+- Expanded detail: Shows heap usage timeline from idle to exhaustion
+- Show unbounded query loading 10K events (100-150 bytes each)
+- Heap timeline: 100MB idle → 200MB (1K events) → 350MB (5K) → 512MB (OOM)
+- Diagnostic signals: "java.lang.OutOfMemoryError: Java heap space" + rapid GC cycles
+- Solution tips: Add pagination, cursor-based fetching, memory limits
 
 #### Chapter 7: Deadlock Detection
-- **Reference**: Diagram 4 (Servlet Architecture - CHECKOUT/KDS FLOW)
-- Show two threads with reverse lock ordering
-- Explain circular wait scenario (orders ↔ kds_orders)
-- Guide readers to PostgreSQL deadlock detection in logs
+- **Reference**: **Diagram 5D** (Use Case 4: Deadlock - `05-servlet-architecture-04-kds-deadlock.svg`)
+- Expanded detail: Shows concurrent transaction flows with circular lock dependency
+- Lock dependency graph: Transaction 1 ↔ Transaction 2 (circular wait)
+- Show how PostgreSQL detects deadlock and ROLLBACKs one transaction
+- Diagnostic signals: "ERROR: deadlock detected" in PostgreSQL logs
+- Prevention tips: Review lock ordering, use thread dumps to identify blocked threads
 
 #### Chapter 8: SSL/TLS Certificate Failures
-- **Reference**: Diagram 4 (Servlet Architecture - SSL section)
-- Show where certificate validation occurs
-- Explain self-signed cert handling in Tomcat
-- Guide readers to TLS exceptions in catalina.log
+- **Reference**: **Diagram 5E** (Use Case 5: SSL - `05-servlet-architecture-05-checkout-ssl.svg`)
+- Expanded detail: Shows transaction rollback sequence when SSL validation fails
+- Transaction timeline: BEGIN → partial INSERTs (orders, order_items) → SSL failure → ROLLBACK
+- Show why no rows are persisted despite partial writes
+- Diagnostic signals: "SSLHandshakeException: PKIX validation failed" + ROLLBACK logs
+- Troubleshooting guide: Certificate validation steps, self-signed cert handling in Tomcat
 
 ---
 
@@ -240,14 +362,22 @@ All diagrams use:
 
 ## 📸 File Sizes & Performance
 
-| Diagram | File Size | Complexity | Best Zoom |
-|---------|-----------|-----------|-----------|
-| 1 (Infrastructure) | ~15 KB | Low-Medium | 100%-150% |
-| 2 (Request Flow) | ~25 KB | Medium | 100%-125% |
-| 3 (Database Schema) | ~18 KB | Medium-High | 75%-100% |
-| 4 (Servlet Architecture) | ~35 KB | High | 50%-100% |
+| Diagram | File Size | Complexity | Best Zoom | Purpose |
+|---------|-----------|-----------|-----------|---------|
+| 1 (Infrastructure) | ~15 KB | Low-Medium | 100%-150% | Architecture overview |
+| 2 (Request Flow) | ~25 KB | Medium | 100%-125% | Flow tracing |
+| 3 (Database Schema) | ~18 KB | Medium-High | 75%-100% | Schema reference |
+| 4 (Servlet Architecture - Overview) | ~35 KB | High | 50%-100% | All 5 flows side-by-side |
+| **5A** (LDAP Timeout) | ~22 KB | Medium | 100% | Chapter 4: Authentication failures |
+| **5B** (DB Leak) | ~28 KB | Medium-High | 100% | Chapter 5: Resource leaks |
+| **5C** (OOM) | ~30 KB | Medium-High | 100% | Chapter 6: Memory pressure |
+| **5D** (Deadlock) | ~32 KB | High | 100% | Chapter 7: Lock contention |
+| **5E** (SSL) | ~26 KB | Medium | 100% | Chapter 8: External dependencies |
 
-All diagrams optimized for both **print publication** (600+ dpi) and **digital display** (web, PDF, e-readers).
+**All diagrams optimized for:**
+- **Print publication** (600+ dpi, A4 size, 100% zoom with readable fonts)
+- **Digital display** (web, PDF, e-readers, screens)
+- **Book chapter integration** (individual diagrams for deep dives, overview diagram for intro)
 
 ---
 
@@ -264,6 +394,7 @@ All diagrams optimized for both **print publication** (600+ dpi) and **digital d
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 3.0 | June 2026 | ✅ **Added 5 individual use-case diagrams** (5A-5E) optimized for A4 print — one diagram per chapter for deep dives; kept Diagram 4 as overview reference |
 | 2.0 | June 2026 | ✅ Regenerated all 4 SVG diagrams with improved visual design, added failure summary table, enhanced annotations |
 | 1.0 | May 2026 | Initial diagram set with text-based ASCII art |
 
@@ -271,15 +402,17 @@ All diagrams optimized for both **print publication** (600+ dpi) and **digital d
 
 ## ✅ Verification Checklist
 
-- [x] All 4 SVG diagrams regenerated and optimized
-- [x] Failure injection points clearly marked in all diagrams
+- [x] All 4 original SVG diagrams (01-04) remain unchanged for reference
+- [x] **5 new use-case diagrams created** (05A-05E) — one per failure type
+- [x] Individual diagrams optimized for **A4 print** with readable fonts
+- [x] Failure injection points clearly marked with numbered steps
+- [x] Detailed diagnostic signals included in each diagram
 - [x] Color coding consistent across all diagrams
 - [x] Cross-references between diagrams documented
-- [x] Pre-seeded data examples included
-- [x] Log signal patterns documented
-- [x] Chapter integration plan provided
+- [x] Chapter integration plan updated (one diagram per chapter)
 - [x] File sizes optimized for web and print
-- [x] All diagrams tested for scalability
+- [x] All 9 diagrams tested for scalability (SVG renders at any zoom)
+- [x] Documentation updated in DIAGRAMS_SUMMARY.md
 
 ---
 

@@ -130,28 +130,32 @@ public class MenuServlet extends HttpServlet {
 
             } catch (Exception e) {
                 logger.error("❌ DATABASE CONNECTION POOL EXHAUSTED", e);
-                buildHardcodedMenu(menu);
             }
         } else {
-            buildHardcodedMenu(menu);
+            // Normal case: fetch menu items from database
+            try {
+                javax.naming.Context ctx = new javax.naming.InitialContext();
+                javax.sql.DataSource ds = (javax.sql.DataSource) ctx.lookup("java:comp/env/jdbc/bytebite");
+
+                try (Connection conn = ds.getConnection();
+                     java.sql.Statement stmt = conn.createStatement();
+                     java.sql.ResultSet rs = stmt.executeQuery("SELECT id, name, price FROM bytebite.menu_items")) {
+
+                    while (rs.next()) {
+                        Map<String, Object> item = new HashMap<>();
+                        item.put("id", rs.getInt("id"));
+                        item.put("name", rs.getString("name"));
+                        item.put("price", rs.getDouble("price"));
+                        item.put("available", true);
+                        menu.add(item);
+                    }
+                }
+            } catch (Exception e) {
+                logger.error("Failed to fetch menu from database", e);
+            }
         }
 
         return menu;
-    }
-
-    private void buildHardcodedMenu(List<Map<String, Object>> menu) {
-        // Sample menu items
-        String[] items = {"Pizza", "Burger", "Pasta", "Salad", "Dessert", "Drink"};
-        double[] prices = {12.99, 10.99, 11.99, 8.99, 5.99, 2.99};
-
-        for (int i = 0; i < items.length; i++) {
-            Map<String, Object> item = new HashMap<>();
-            item.put("id", i + 1);
-            item.put("name", items[i]);
-            item.put("price", prices[i]);
-            item.put("available", true);
-            menu.add(item);
-        }
     }
 
 }

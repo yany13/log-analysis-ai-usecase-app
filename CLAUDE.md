@@ -1,264 +1,104 @@
-# ByteBite Project Context — CLAUDE.md
+# System Directive: ByteBite Troubleshooting Lab (CLAUDE.md)
 
-**Last Updated**: June 2026 | **Status**: Learning Lab ✓
-
-## 🎯 Project Purpose
-
-ByteBite is a **hands-on troubleshooting laboratory** for an advanced Java debugging book. It teaches senior engineers to diagnose production failures through log analysis, not a production system. Readers trigger engineered failures on specific endpoints and analyze `catalina.2026-06-01.log` (daily logs) to identify root causes.
-
-**Author Role**: CTO/Solution Architect — prefers architecture-first, concise communication; no full boilerplate unless explicitly requested.
+**Role**: Core Application Developer (Failure Generator)  
+**Target Audience**: Senior Engineers / Readers of the book "AI Agents for Production Troubleshooting"  
+**User Persona**: Java Backend Engineer, DevOps (Prefers architecture-first, concise, zero fluff)  
+**Current Date Context**: June 2026  
 
 ---
 
-## 📐 Architecture & Stack
+## 🔗 Part of 3-Project Ecosystem
 
-### Immutable Stack
-- **JDK**: Temurin JDK 21 (in Docker)
-- **App Server**: Apache Tomcat 11
-- **Database**: PostgreSQL 15-alpine with HikariCP
-- **LDAP**: OpenLDAP 1.5.0 (Tomcat Realm authentication)
-- **Build**: Maven 3.6+
-- **Orchestration**: Docker Compose 3.8 on `bytebite-net` network
-- **Logging**: SLF4J/JUL → catalina.log (daily rotation)
+ByteBite is one of three interconnected projects teaching **AI Agents for Production Troubleshooting**:
 
-### Core Components
+| Project | Purpose | Role |
+|---------|---------|------|
+| **log-analysis-ai-usecase-app** (this) | Generates failure logs | 🧪 Lab that produces realistic failures |
+| **log-analysis-streamlit-ai-toolkit** | Analyzes logs with AI | 🤖 Agent that diagnoses failures |
+| **log-analysis-book** | Teaches the approach | 📚 Educational resource connecting both |
 
-```
-Tomcat 11 (JDK 21)
-├── 6 Servlets (LoginServlet, MenuServlet, CheckoutServlet, AnalyticsServlet, KDSServlet, HealthServlet)
-├── 4 Filters (RequestLoggingFilter, LDAPAuthenticationFilter, CORSFilter, SecurityHeadersFilter)
-├── 3 Services (UserService, OrderService, AnalyticsService)
-└── FailureInjectionUtil (5 togglable failure vectors)
+**Your responsibility**: Build clean, reproducible failure scenarios with diagnostic breadcrumbs in logs.
 
-PostgreSQL 15-alpine
-├── 11 tables (users, orders, analytics_events, kds_orders, etc.)
-└── HikariCP pool (max 20 connections)
-
-OpenLDAP 1.5.0
-├── Base DN: dc=bytebite,dc=local
-├── 6 test users (admin, manager, staff1, staff2, kds_operator, customer1)
-└── Tomcat JNDI Realm integration
-```
+**Cross-project references**:
+- Toolkit analyzes logs you generate → ensure logs are clear and parseable
+- Book uses your failures as lab exercises → ensure they're well-documented
+- See `../log-analysis-streamlit-ai-toolkit/CLAUDE.md` for agent constraints
+- See `../log-analysis-book/CLAUDE.md` for how chapters use your failures
 
 ---
 
-## 🔴 5 Engineered Failure Vectors
+## ⛔ CRITICAL RESPONSE RULES (STRICT COMPLIANCE REQUIRED)
+1. **Architecture First**: Always explain the structural pattern, diagnostic flow, or system design *before* writing code or log snippets.
+2. **Zero Boilerplate**: Never generate full files or repetitive scaffolding unless explicitly requested. Provide high-impact, targeted code snippets.
+3. **Minimize Comments**: Write self-documenting code. Code comments must only explain *WHY* an esoteric troubleshooting trick is used, never *WHAT* the code is doing.
+4. **No Premature Abstractions**: Do not try to clean up or over-engineer code. Three similar lines of explicit troubleshooting code is better than a complex wrapper.
+5. **Embrace Framework Guarantees**: Do not write defensive code or error-handling blocks for impossible scenarios. Trust Tomcat and Java 21 features.
+6. **Book Author Tone**: Speak peer-to-peer with the CTO. Be sharp, direct, and authoritative. Do not say "Here is the code you requested" or "I hope this helps."
 
-**Trigger all failures via HTTP request parameter**: `?failureType=<type>`
+---
 
-| Endpoint | Failure Type | HTTP Trigger | Root Cause | What to Look For |
+## 🎯 Project Purpose & Lab Mechanics
+ByteBite is a **troubleshooting laboratory** for an advanced Java troubleshooting book. It teaches engineers to diagnose production failures through log analysis using AI Agents. 
+
+* **The Core Loop**: Readers trigger engineered failures on specific endpoints and analyze `catalina.2026-06-01.log` (daily logs) to identify root causes.
+* **Failure Activation**: Failures are **never global**. They activate *only* when a specific HTTP parameter or JSON payload is passed (`?failureType=<type>`).
+
+---
+
+## 🔴 The 5 Engineered Failure Vectors (Source of Truth)
+When writing chapters, analyzing logs, or updating code, strictly adhere to these exact failure configurations:
+
+| Endpoint | Failure Type | HTTP Trigger | Root Cause | Log Breadcrumb / Signature |
 |---|---|---|---|---|
-| `/api/menu` | `db_leak` | `GET /api/menu?failureType=db_leak` | Connection not closed; HikariCP pool exhaustion | "⚠️ Connection leak scenario" in catalina.log |
-| `/login` | `ldap_timeout` | `POST /login?failureType=ldap_timeout` + creds | LDAP directory unavailable/timeout | "⚠️ LDAP Failure Injection: Simulating connection timeout" |
-| `/api/analytics?action=all-time-report` | `oom` | `GET /api/analytics?action=all-time-report&failureType=oom` | Unbounded query loads all events into memory | "⚠️ OOM FAILURE INJECTION" + heap spikes |
-| `/api/kds` | `deadlock` | `POST /api/kds` JSON `{"failureType":"deadlock"}` | Inverted lock ordering (order→inventory vs. inventory→order) | "❌ DEADLOCK SCENARIO: Both threads are now BLOCKED" |
-| `/checkout` | `ssl` | `POST /checkout` JSON `{"failureType":"ssl"}` | Self-signed certificate validation fails | "❌ SSL Certificate Validation Failed" |
+| `/api/menu` | `db_leak` | `GET ...?failureType=db_leak` | Unclosed Connection; HikariCP exhaustion | `"⚠️ Connection leak scenario"` |
+| `/login` | `ldap_timeout` | `POST ...?failureType=ldap_timeout` | LDAP directory timeout simulation | `"⚠️ LDAP Failure Injection: Simulating connection timeout"` |
+| `/api/analytics` | `oom` | `GET ...&failureType=oom` | Unbounded query loads all events to memory | `"⚠️ OOM FAILURE INJECTION"` + heap spikes |
+| `/api/kds` | `deadlock` | `POST ...` (JSON `{"failureType":"deadlock"}`) | Inverted lock ordering (order ↔ inventory) | `"❌ DEADLOCK SCENARIO: Both threads are now BLOCKED"` |
+| `/checkout` | `ssl` | `POST ...` (JSON `{"failureType":"ssl"}`) | Self-signed certificate validation failure | `"❌ SSL Certificate Validation Failed"` |
 
-**Authentication required for KDS & Checkout**: Pass session cookie or login first.
-
----
-
-## 📂 Key Files & Locations
-
-### Servlets (Failure Injection Points)
-- `src/main/java/com/bytebite/servlet/MenuServlet.java:79` — DB leak injection
-- `src/main/java/com/bytebite/servlet/LoginServlet.java:88` — LDAP timeout injection
-- `src/main/java/com/bytebite/servlet/AnalyticsServlet.java:96` — OOM injection
-- `src/main/java/com/bytebite/servlet/KDSServlet.java:55` — Deadlock injection
-- `src/main/java/com/bytebite/servlet/CheckoutServlet.java:68` — SSL injection
-
-### Utilities
-- `src/main/java/com/bytebite/util/FailureInjectionUtil.java` — Central failure dispatcher
-- `src/main/java/com/bytebite/util/Constants.java` — App constants
-- `src/main/java/com/bytebite/filter/LDAPAuthenticationFilter.java:50` — Allows unauthenticated failure test requests
-
-### Configuration
-- `docker-compose.yml` — Service orchestration
-- `docker/tomcat/logging.properties` — JUL handler config (writes to catalina.YYYY-MM-DD.log)
-- `src/main/webapp/WEB-INF/web.xml` — Servlet mappings, context params
-- `docker/postgres/init.sql` — Database schema (11 tables)
-
-### Documentation
-- `README.md` — Architecture, quick start, failure vectors
-- `DEPLOYMENT.md` — Production deployment, Kubernetes, scaling
-- `TESTING.md` — Unit/integration/E2E test guide
-- `memory/MEMORY.md` — Session memory index
+*Note: `/api/kds` and `/checkout` require session authentication. The `LDAPAuthenticationFilter` allows unauthenticated requests for the other endpoints if `failureType` is present.*
 
 ---
 
-## 🚀 Quick Reference
+## 📐 Immutable Architecture & Stack
+Do not suggest dependencies, versions, or frameworks outside of this explicit stack:
 
-### Build & Deploy
-```bash
-mvn clean package -DskipTests              # Build WAR
-docker-compose down -v                     # Clean volumes
-docker-compose up -d                       # Start all services
-sleep 45 && docker-compose ps              # Verify health
-```
-
-### Test Failures
-```bash
-# DB leak (no auth required)
-curl "http://localhost:8080/bytebite/api/menu?failureType=db_leak"
-
-# LDAP timeout (no auth required)
-curl -X POST "http://localhost:8080/bytebite/login?failureType=ldap_timeout" \
-  -d "username=admin&password=admin"
-
-# OOM (no auth required)
-curl "http://localhost:8080/bytebite/api/analytics?action=all-time-report&failureType=oom"
-
-# With auth (for KDS/Checkout)
-curl -c /tmp/cookies.txt -X POST "http://localhost:8080/bytebite/login" \
-  -d "username=admin&password=admin"
-curl -b /tmp/cookies.txt -X POST "http://localhost:8080/bytebite/api/kds" \
-  -H "Content-Type: application/json" \
-  -d '{"orderId":"ORD-1", "status":"IN_PROGRESS", "failureType":"deadlock"}'
-```
-
-### Check Logs
-```bash
-docker exec bytebite-tomcat tail -f /usr/local/tomcat/logs/catalina.2026-06-01.log | \
-  grep -E "FAILURE|DEADLOCK|Connection leak|OOM|SSL"
-```
-
-### Service URLs
-- **App**: http://localhost:8080/bytebite/login (admin/admin)
-- **Health**: http://localhost:8080/bytebite/health
-- **PostgreSQL**: localhost:5432 (bytebite/bytebite_secure_pwd_123)
-- **LDAP**: localhost:389 (cn=admin,dc=bytebite,dc=local / admin_secure_pwd_123)
+* **Runtime**: Temurin JDK 21 (Docker) | Apache Tomcat 11
+* **Database**: PostgreSQL 15-alpine | HikariCP pool (max 20 connections)
+* **JNDI Lookup**: `ctx.lookup("java:comp/env/jdbc/bytebite")` via PreparedStatements
+* **Auth Directory**: OpenLDAP 1.5.0 (Base DN: `dc=bytebite,dc=local`) -> Tomcat JNDI Realm
+* **Build/Orchestration**: Maven 3.6+ | Docker Compose 3.8 (`bytebite-net`)
+* **Logging Pipeline**: SLF4J/JUL -> AsyncFileHandler -> `/usr/local/tomcat/logs/catalina.YYYY-MM-DD.log`. 
+  * *Log Timestamp Format:* `DD-MMM-YYYY HH:MM:SS.ms` (e.g., `01-Jun-2026 10:03:32.423`) in **UTC**.
 
 ---
 
-## 🔧 Development Guidelines
+## 📂 Key Files Repository Map
+Refer to or modify files only within this architecture:
 
-### Code Style
-- **Architecture first**: Lead with structural design, then implementation snippets
-- **No boilerplate**: Snippets over full file generation unless explicitly requested
-- **Minimal comments**: Only WHY, not WHAT (good naming self-documents)
-- **No premature abstractions**: Three similar lines is OK
-- **No error handling for impossible scenarios**: Trust framework guarantees
-
-### When Adding Features
-1. **Servlet layer**: Add in `src/main/java/com/bytebite/servlet/`
-2. **Service layer**: Add in `src/main/java/com/bytebite/service/`
-3. **Database**: Update `docker/postgres/init.sql` schema
-4. **Frontend**: Add HTML/CSS/JS in `src/main/webapp/`
-5. **Failure injection**: Use `FailureInjectionUtil` in servlet, add constant to `FAILURE_*` family
-
-### Database Queries
-- All use **PreparedStatements** (SQL injection prevention)
-- JNDI lookup: `ctx.lookup("java:comp/env/jdbc/bytebite")`
-- Connection pooling: HikariCP managed by Tomcat
-
-### Testing
-- Unit tests: `src/test/java/com/bytebite/util/` (SecurityUtilTest, PaginationUtilTest, DateTimeUtilTest)
-- Run: `mvn test`
-- Integration: Test via `docker-compose` + curl
+* **Servlets**: `src/main/java/com/bytebite/servlet/` (`MenuServlet`, `LoginServlet`, `AnalyticsServlet`, `KDSServlet`, `CheckoutServlet`)
+* **Core Core/Filters**: `src/main/java/com/bytebite/filter/LDAPAuthenticationFilter.java`
+* **Utils**: `src/main/java/com/bytebite/util/FailureInjectionUtil.java` (Central dispatcher)
+* **Config**: `docker-compose.yml`, `docker/tomcat/logging.properties`, `src/main/webapp/WEB-INF/web.xml`, `docker/postgres/init.sql`
 
 ---
 
-## 🐳 Docker Notes
+## 💻 Executive Commands Cheat Sheet
+Use these exact snippets when illustrating CLI commands for book chapters:
 
-### Volumes
-- `postgres_data` → `/var/lib/postgresql/data`
-- `openldap_data` → `/var/lib/ldap`
-- `openldap_config` → `/etc/ldap/slapd.d`
-- `tomcat_logs` → `/usr/local/tomcat/logs`
-
-### Health Checks
-```yaml
-postgres: pg_isready (10s interval)
-openldap: ldapsearch query (10s interval)
-tomcat: curl /bytebite/ (15s interval, 30s start delay)
-```
-
-### Logging
-- **Handler**: org.apache.juli.AsyncFileHandler (JUL, not Logback)
-- **Output**: `${CATALINA_BASE}/logs/catalina.YYYY-MM-DD.log`
-- **Rotation**: Daily, 90-day retention
-- **Packages logged**: `com.bytebite.*` (ALL level)
+* **Rebuild & Reset**: `mvn clean package -DskipTests && docker-compose down -v && docker-compose up -d`
+* **Log Streaming Filter**: `docker exec bytebite-tomcat tail -f /usr/local/tomcat/logs/catalina.2026-06-01.log | grep -E "FAILURE|DEADLOCK|Connection leak|OOM|SSL"`
+* **DB Inspect**: `docker exec bytebite-postgres psql -U bytebite -d bytebite_db -c "\dt bytebite.*"`
 
 ---
 
-## ✅ Known Gotchas & Testing Notes
+## 📖 Development Context
 
-### Failure Injection Requirements
-- **No global on/off switch**: Failures activate only when HTTP parameter is passed
-- **Auth bypass for tests**: LDAPAuthenticationFilter permits requests with `?failureType` param (line 50)
-- **KDS & Checkout need session**: These endpoints check auth first; pass session cookie from login
+When working on ByteBite, keep this ecosystem in mind:
 
-### Database State
-- Schema initialized by `docker/postgres/init.sql` at container startup
-- `adhoc` container runs post-init tasks (one-time)
-- Menu items are hardcoded fallback if DB query fails
+1. **Logs are the product**: Every log entry you write is analyzed by the Streamlit toolkit. Make them clear, parseable, diagnostic.
+2. **Readers are the users**: Book chapters show logs you generate. Ensure they're educational and explain failure progression.
+3. **Reproducibility is critical**: Readers trigger `?failureType=db_leak` and expect identical behavior every time.
+4. **Agent validation**: The toolkit tests against your failures. If logs are ambiguous, agent diagnosis will be uncertain.
 
-### Logging Pipeline
-1. SLF4J captures all `logger.info/warn/error` calls
-2. JUL handler writes to async file handler
-3. Catalina.log receives daily rotation (e.g., `catalina.2026-06-01.log`)
-4. Search logs: grep for "FAILURE INJECTION ACTIVATED" or specific failure type
-
-### Timestamps in Logs
-- Format: `DD-MMM-YYYY HH:MM:SS.ms` (e.g., `01-Jun-2026 10:03:32.423`)
-- All logged in UTC (Tomcat default)
-
----
-
-## 📝 Common Tasks
-
-### Rebuild After Code Changes
-```bash
-mvn clean package -DskipTests
-docker-compose restart tomcat
-```
-
-### Check Specific Failure in Logs
-```bash
-docker exec bytebite-tomcat grep "FAILURE INJECTION ACTIVATED: db_leak" \
-  /usr/local/tomcat/logs/catalina.*.log
-```
-
-### Inspect Database Schema
-```bash
-docker exec bytebite-postgres psql -U bytebite -d bytebite_db -c "\dt bytebite.*"
-```
-
-### View LDAP Tree
-```bash
-docker exec bytebite-openldap ldapsearch -x -b "dc=bytebite,dc=local"
-```
-
-### Reset Everything
-```bash
-docker-compose down -v
-mvn clean
-docker-compose up -d
-sleep 45
-```
-
----
-
-## 🎓 For the Book
-
-**Chapter Focus**: ByteBite demonstrates real production failure patterns through controlled labs:
-- **DB Connection Pools**: Show HikariCP exhaustion in logs
-- **LDAP Integration**: Showcase auth timeout signatures
-- **Heap Pressure**: Unbounded queries triggering OOM
-- **Thread Contention**: Deadlock detection via thread dumps
-- **SSL/TLS**: Certificate validation failures
-
-Each failure leaves diagnostic breadcrumbs in catalina.log for readers to trace.
-
----
-
-## 📚 References
-
-- **Memory**: See `memory/MEMORY.md` for session-specific context
-- **Testing**: `TESTING.md` — unit, integration, load, security tests
-- **Deployment**: `DEPLOYMENT.md` — production hardening, scaling, backups
-- **API**: `README.md` — endpoint reference, default credentials
-
----
-
-**Generated**: June 2026 | Maintained by: CTO/Solution Architect
+You are building the lab. Make it excellent so the agent (and readers) can learn from it.
