@@ -1,0 +1,89 @@
+Failure #3: Out of Memory (OOM) - Unbounded all-time analytics report
+
+SYMPTOM
+The all-time analytics request fails with HTTP 500 after about 2 seconds.
+The response body is exactly: {"error": "OutOfMemoryError: Java heap space"}
+The server log shows java.lang.OutOfMemoryError: Java heap space. The Tomcat process normally stays up and other requests keep working.
+Search for the exact text "OutOfMemoryError: Java heap space" (not "out of memory", which does not appear in the log).
+
+ROOT CAUSE
+AnalyticsServlet.generateAllTimeReport runs an unbounded query on bytebite.analytics_events and loads ALL rows into memory in one request.
+Normally results are read in pages.in our use case the heap fills up inside a single request.
+Classification: unbounded request. It is NOT a memory leak (objects do not persist across requests) and NOT an undersized heap (a larger heap only delays the failure).
+
+ENDPOINT AND TRIGGER
+POST /bytebite/api/analytics with JSON body {"action":"all-time-report"}
+Authentication is required first (log in and reuse the session cookie). Without a session the request is redirected with HTTP 302 to /bytebite/login.
+
+LOG SIGNATURES (in order)
+1. OOM FAILURE :Loading all-time analytics without pagination
+2. Generating all-time analytics report - loading ALL data into memory
+3. Executing unbounded query: SELECT event_type, event_data, user_id, created_at FROM bytebite.analytics_events
+4. Loaded 1000 / 2000 / 3000 / 4000 events into memory (heap usage increasing)
+5. OOM FAILURE: Java heap space
+6. java.lang.OutOfMemoryError: Java heap space at AnalyticsServlet.generateAllTimeReport
+7. POST /bytebite/api/analytics - Status: 500
+
+DIAGNOSTIC APPROACH
+- Find the one request that triggered it: the all-time report on a single thread (same http-nio thread in every line).
+- Look at the Loaded counters. Steady growth inside one request means accumulation, not a leak.
+- Check the query: no LIMIT or paging means unbounded.
+- Check the heap setting with: jcmd <pid> VM.flags (look at MaxHeapSize).
+- Check GC logs for frequent full collections shortly before the error.
+
+SOLUTION
+1. The fix is to ask the database for that number, not for the rows. Aggregation in SQL sends a handful of values across the connection and never builds the list:
+String sql = "SELECT event_type, COUNT(*) AS total FROM bytebite.analytics_events GROUP BY event_type";
+try (Connection conn = ds.getConnection();
+     PreparedStatement ps = conn.prepareStatement(sql)) {
+    ps.setQueryTimeout(30);
+    try (ResultSet rs = ps.executeQuery()) {
+        while (rs.next()) { /* one small row per event type */ }
+    }
+}
+
+2. Put a cap and a query timeout on this endpoint (for example 30 seconds and a maximum row count).
+3. Set -Xms and -Xmx deliberately (same value on servers) as a safety margin. This is not the fix. Raising -Xmx alone only delays the failure.
+4. Add -XX:+HeapDumpOnOutOfMemoryError and a dump path so the next occurrence can be analysed.
+ 
+HOW TO INCREASE TOMCAT MEMORY (-Xms / -Xmx)
+Do this as a safety margin after the code fix, or as a temporary stabilisation. Heap size is set with -Xms (initial) and -Xmx (maximum). On servers use the same value for both.
+
+Step 1. Check the current heap size.
+  jcmd <pid> VM.flags
+  Look at InitialHeapSize and MaxHeapSize (bytes). Without jcmd, look at the "Picked up" line at the top of catalina.out.
+
+Step 2. Choose the new value.
+  Raise in steps, for example 512m to 1g to 2g. Leave room for non-heap memory (metaspace, thread stacks): the process uses about 25 to 50 percent more than Xmx.
+  In a container, the container memory limit must be larger than Xmx plus that overhead, otherwise the container is killed (exit code 137) with no OutOfMemoryError in the log.
+
+Step 3. Set it in setenv (not in catalina.sh), so it survives upgrades.
+  Linux: create $CATALINA_BASE/bin/setenv.sh
+    CATALINA_OPTS="$CATALINA_OPTS -Xms2g -Xmx2g"
+  Windows: create %CATALINA_BASE%\bin\setenv.bat
+    set "CATALINA_OPTS=%CATALINA_OPTS% -Xms2g -Xmx2g"
+  Windows service (tomcat11w.exe): Configure > Java tab > Initial memory pool = 2048, Maximum memory pool = 2048 (MB).
+  Docker Compose (service bytebite-tomcat):
+    environment:
+      - CATALINA_OPTS=-Xms2g -Xmx2g
+    Recreate the container so the new value is read:
+    docker compose up -d --force-recreate bytebite-tomcat
+
+Step 4. Restart Tomcat (not needed for Docker after the recreate above).
+  Linux:   bin/shutdown.sh then bin/startup.sh
+  Windows: net stop Tomcat11 then net start Tomcat11 (service name may differ)
+
+Step 5. Verify.
+  jcmd <pid> VM.flags   (MaxHeapSize must show the new value, for 2g about 2147483648)
+  Docker: docker stats bytebite-tomcat   (memory usage and limit)
+
+Step 6. Add a heap dump so the next failure can be analysed.
+  CATALINA_OPTS="$CATALINA_OPTS -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/usr/local/tomcat/logs"
+
+Warning: for this failure a bigger heap only delays the error. The report still loads every row at once, so with more data it will fail again. Fix the query (paging or streaming), then use the heap setting as headroom.
+
+PREVENTION
+- Use pagination or streaming for any result set larger than 1 MB.
+- Set query timeouts.
+- Alert when heap usage stays above 80 percent.
+- Load test with realistic data volume.

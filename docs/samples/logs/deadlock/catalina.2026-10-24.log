@@ -1,0 +1,11 @@
+24-Oct-2026 09:35:34.372 INFO [http-nio-8080-exec-5] com.bytebite.filter.RequestLoggingFilter.doFilter POST /bytebite/login - Status: 200 - Duration: 3ms
+24-Oct-2026 09:35:43.882 INFO [http-nio-8080-exec-7] com.bytebite.filter.RequestLoggingFilter.doFilter POST /bytebite/api/kds from 172.18.0.1
+24-Oct-2026 09:35:43.884 INFO [OrderUpdateWorker-1] com.bytebite.servlet.KDSServlet.lambda$updateOrderStatusWithDeadlock$0 Thread-1: Attempting to acquire orderLock
+24-Oct-2026 09:35:43.884 INFO [InventoryUpdateWorker-2] com.bytebite.servlet.KDSServlet.lambda$updateOrderStatusWithDeadlock$1 Thread-2: Attempting to acquire inventoryLock
+24-Oct-2026 09:35:44.384 SEVERE [http-nio-8080-exec-7] com.bytebite.servlet.KDSServlet.updateOrderStatusWithDeadlock ❌ DEADLOCK DETECTED: Both threads blocked with inverted lock ordering
+24-Oct-2026 09:35:44.384 SEVERE [http-nio-8080-exec-7] com.bytebite.servlet.KDSServlet.updateOrderStatusWithDeadlock Thread-1 (OrderUpdateWorker-1) state: BLOCKED waiting for inventoryLock
+24-Oct-2026 09:35:44.384 SEVERE [http-nio-8080-exec-7] com.bytebite.servlet.KDSServlet.updateOrderStatusWithDeadlock Thread-2 (InventoryUpdateWorker-2) state: BLOCKED waiting for orderLock
+24-Oct-2026 09:35:44.385 SEVERE [http-nio-8080-exec-7] com.bytebite.servlet.KDSServlet.doPost ❌ DEADLOCK DETECTED
+	java.lang.Exception: Deadlock detected: Thread-1 blocked on inventoryLock, Thread-2 blocked on orderLock
+		at com.bytebite.servlet.KDSServlet.updateOrderStatusWithDeadlock(KDSServlet.java:150)
+		at com.bytebite.servlet.KDSServlet$1.run(KDSServlet.java:145)

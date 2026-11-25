@@ -1,0 +1,18 @@
+24-Oct-2026 10:01:48.161 INFO [http-nio-8080-exec-1] com.bytebite.servlet.LoginServlet.authenticateUser LDAP authentication successful for user: admin
+24-Oct-2026 10:02:08.372 INFO [http-nio-8080-exec-7] com.bytebite.filter.RequestLoggingFilter.doFilter POST /bytebite/checkout from 172.18.0.1
+24-Oct-2026 10:02:08.377 WARNING [http-nio-8080-exec-7] com.bytebite.util.FailureInjectionUtil.logFailureActivation ⚠️ FAILURE : ssl
+24-Oct-2026 10:02:08.377 WARNING [http-nio-8080-exec-7] com.bytebite.servlet.CheckoutServlet.handleAPIOrder ⚠️ SSL : Attempting connection to payment gateway with self-signed certificate
+24-Oct-2026 10:02:08.377 WARNING [http-nio-8080-exec-7] com.bytebite.servlet.CheckoutServlet.testSSLHandshakeFailure Attempting HTTPS connection to: https://expired.badssl.com/
+24-Oct-2026 10:02:08.937 INFO [http-nio-8080-exec-7] com.bytebite.servlet.CheckoutServlet.testSSLHandshakeFailure Initiating SSL handshake with expired.badssl.com
+24-Oct-2026 10:02:09.802 SEVERE [http-nio-8080-exec-7] com.bytebite.servlet.CheckoutServlet.testSSLHandshakeFailure SSL Handshake Exception caught: (certificate_expired) PKIX path validation failed: java.security.cert.CertPathValidatorException: validity check failed
+24-Oct-2026 10:02:09.803 SEVERE [http-nio-8080-exec-7] com.bytebite.servlet.CheckoutServlet.handleAPIOrder ❌ SSL CERTIFICATE VALIDATION FAILED
+	javax.net.ssl.SSLHandshakeException: (certificate_expired) PKIX path validation failed: java.security.cert.CertPathValidatorException: validity check failed
+		at java.base/sun.security.ssl.Alert.createSSLException(Alert.java:130)
+		at java.base/java.lang.Thread.run(Thread.java:1583)
+	Caused by: sun.security.validator.ValidatorException: PKIX path validation failed: java.security.cert.CertPathValidatorException: validity check failed
+		at java.base/sun.security.validator.PKIXValidator.doValidate(PKIXValidator.java:313)
+		... 62 more
+	Caused by: java.security.cert.CertificateExpiredException: NotAfter: Sun Apr 12 23:59:59 UTC 2015
+		at java.base/sun.security.provider.certpath.PKIXMasterCertPathValidator.validate(PKIXMasterCertPathValidator.java:125)
+		... 67 more
+24-Oct-2026 10:02:09.803 SEVERE [http-nio-8080-exec-7] com.bytebite.servlet.CheckoutServlet.handleAPIOrder Cause: sun.security.validator.ValidatorException: PKIX path validation failed: java.security.cert.CertPathValidatorException: validity check failed

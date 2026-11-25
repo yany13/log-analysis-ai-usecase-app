@@ -1,0 +1,44 @@
+Failure #4: Thread Deadlock
+Failure Type
+deadlock
+Endpoint & Trigger
+Endpoint: POST /api/kds
+Trigger: JSON {"failureType":"deadlock"}
+(Requires authentication)
+
+Root Cause
+KDSServlet spawns two threads that update order and inventory with locks. Thread-1 locks order→inventory. Thread-2 locks inventory→order. Inverted lock ordering creates circular waiting: Thread-1 holds orderLock, waiting for inventoryLock. Thread-2 holds inventoryLock, waiting for orderLock. Neither can proceed.
+
+Log Signatures
+Thread-1: Attempting to acquire inventoryLock (blocked)
+Thread-2: Attempting to acquire orderLock (blocked)
+
+Diagnostic Approach
+•	Look for explicit deadlock messages in logs
+•	Check thread dump: jcmd <pid> Thread.print
+•	Look for circular wait: Thread A waiting for lock held by Thread B, Thread B waiting for lock held by Thread A
+•	Determine lock acquisition order in each thread
+
+Code Pattern (Vulnerable)
+KDSServlet.java (lines 149-188):
+// Thread 1: order → inventory
+synchronized (orderLock) {
+  synchronized (inventoryLock) { ... }
+}
+// Thread 2: inventory → order (opposite order)
+synchronized (inventoryLock) {
+  synchronized (orderLock) { ... }
+}
+
+Solution
+1.	Always acquire locks in the same order in all threads:
+synchronized (orderLock) {
+  synchronized (inventoryLock) {
+    // update both
+  }
+}
+
+2.	Or use a single lock for both resources:
+private final Object updateLock = new Object();
+
+3.	Or use java.util.concurrent.locks.ReentrantReadWriteLock

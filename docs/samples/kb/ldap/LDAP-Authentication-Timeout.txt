@@ -1,0 +1,20 @@
+LDAP Authentication Timeout
+Failure Type
+ldap_timeout
+Endpoint & Trigger
+Endpoint: POST /login
+Root Cause
+LoginServlet attempts to authenticate a user against OpenLDAP (ldap://openldap:389). When failure injection is active, the LDAP connection times out .
+❌ LDAP AUTHENTICATION FAILED jakarta.servlet.ServletException: LDAP connection timeout after 30000ms
+..
+Caused by: javax.naming.CommunicationException: openldap:389: Connection timed out [Root exception is java.net.ConnectException: Connection timed out: no further information]
+Diagnostic Approach
+•	Look for login requests with 30+ second response times
+•	Search logs for CommunicationException or JNDI errors
+Solution
+1.	Set LDAP connection timeout (in Tomcat server.xml):
+com.sun.jndi.ldap.connect.timeout=60000
+2.	Set LDAP read timeout:
+com.sun.jndi.ldap.read.timeout=60000
+
+

@@ -1,0 +1,33 @@
+Endpoint: POST /checkout
+
+Root Cause
+CheckoutServlet attempts to connect to a payment gateway using HTTPS. With failure injection, the code uses a self-signed certificate that is not valid. SSL handshake fails, throwing "java.security.cert.CertPathValidatorException: validity check failed"
+
+Log Signatures
+PKIX path validation failed: java.security.cert.CertPathValidatorException: validity check failed
+
+Diagnostic Approach
+1. Check the expiration date of the keystore certificate:
+keytool -list -v -keystore /path/to/keystore.jks -storepass your_password
+2. If the certificate has expired, you will need to generate a new CSR, get it signed by a trusted CA (or renew your self-signed certificate), and import it back into your keystore.
+
+Solution
+
+1
+keytool -genkeypair -alias tomcat -keyalg RSA -keysize 2048 -validity 365 -keystore tomcat.jks -storepass changeit -keypass changeit
+mv tomcat.jks /path/to/tomcat/conf/
+2 Open Tomcat's conf/server.xml file, find the HTTPS <Connector> element (usually commented out by default), and update or add it with your keystore details:
+<Connector port="8443" 
+           protocol="org.apache.coyote.http11.Http11NioProtocol"
+           maxThreads="150" 
+           SSLEnabled="true">
+    <SSLHostConfig>
+        <Certificate certificateKeystoreFile="conf/tomcat.jks"
+                     certificateKeystorePassword="changeit"
+                     certificateKeystoreType="JKS"
+                     type="RSA" />
+    </SSLHostConfig>
+</Connector>
+3. Restart Tomcat
+/path/to/tomcat/bin/shutdown.sh
+/path/to/tomcat/bin/startup.sh

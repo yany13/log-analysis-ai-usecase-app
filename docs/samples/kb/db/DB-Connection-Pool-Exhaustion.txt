@@ -1,0 +1,28 @@
+Database Connection Pool Exhaustion
+
+Failure Type
+db_pool_exhausted
+
+Endpoint & Trigger
+Endpoint: POST /api/menu (MenuServlet.doPost → handleAPIRequest → getMenu → buildMenu)
+
+Root Cause
+MenuServlet.buildMenu requests a JDBC connection from the Tomcat DBCP pool (maximumPoolSize=20). All 20 connections are checked out (active=20, idle=0) and are not returned to the pool. The requesting thread waits for the full connectionTimeout of 30000ms and then fails. Only one thread is waiting (waiting=1), which indicates connections are leaked or held too long (for example, not closed on an exception path, or held during slow non-DB work), not that the pool is undersized for normal load.
+
+❌ DATABASE CONNECTION POOL EXHAUSTED
+java.sql.SQLException:  Connection is not available, request timed out after 30000ms (total=20, active=20, idle=0, waiting=1)
+at com.bytebite.servlet.MenuServlet.buildMenu(MenuServlet.java:129)
+..
+
+Diagnostic Approach
+Take 2-3 thread dumps (jcmd <pid> Thread.print) 10 seconds apart and look for threads sitting in MenuServlet.buildMenu while holding a connection
+
+Solution
+Fix the connection leak in MenuServlet.buildMenu (use try-with-resources for Connection, Statement and ResultSet, and release the connection before any further processing):
+try (Connection c = dataSource.getConnection();
+     PreparedStatement ps = c.prepareStatement(sql)) {
+    ps.setQueryTimeout(10);
+    try (ResultSet rs = ps.executeQuery()) {
+        // map rows to a list/DTO only
+    }
+}

@@ -28,3 +28,11 @@ logs/
 
 # Environment
 .env
+
+# Curl session files
+cookies.txt
+%COOKIES%
+
+# Reference failure logs are versioned
+!docs/samples/logs/
+!docs/samples/logs/**
